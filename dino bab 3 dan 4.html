@@ -1,0 +1,1683 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Petualangan Dino Informatika - SDIT Gema Insan Mandiri</title>
+    <!-- Tailwind CSS untuk tata letak dan UI modern -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Google yang ramah anak & bergaya game -->
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            overflow-x: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        .font-game {
+            font-family: 'Fredoka', sans-serif;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        /* Animasi tombol game 3D */
+        .btn-game {
+            transition: all 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 5px 0 rgba(0, 0, 0, 0.25);
+        }
+        .btn-game:active {
+            transform: translateY(4px);
+            box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
+        }
+        /* Animasi getar saat menabrak atau salah */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20% { transform: translateX(-8px); }
+            40% { transform: translateX(8px); }
+            60% { transform: translateX(-6px); }
+            80% { transform: translateX(6px); }
+        }
+        .animate-shake {
+            animation: shake 0.4s ease-in-out;
+        }
+        /* Animasi pop-in modal */
+        @keyframes popIn {
+            0% { opacity: 0; transform: scale(0.9) translateY(10px); }
+            100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .animate-pop {
+            animation: popIn 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-800 min-h-screen flex flex-col justify-between">
+
+    <!-- HEADER & STATUS BAR (HUD) -->
+    <header class="bg-gradient-to-r from-emerald-700 via-teal-700 to-emerald-800 text-white shadow-lg border-b-4 border-amber-400 px-3 py-2 sm:px-6 sm:py-3 z-20">
+        <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-2">
+            <!-- Identitas Sekolah -->
+            <div class="flex items-center gap-2.5">
+                <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-amber-400 text-emerald-950 flex items-center justify-center font-game font-bold text-xl shadow-md border-2 border-white">
+                    🦖
+                </div>
+                <div>
+                    <h1 class="font-game font-bold text-sm sm:text-lg leading-tight tracking-wide text-amber-300">
+                        SDIT GEMA INSAN MANDIRI
+                    </h1>
+                    <p class="text-[11px] sm:text-xs text-emerald-100 font-medium">
+                        Misi Dino Informatika • Kelas 4 (Bab 3 & 4)
+                    </p>
+                </div>
+            </div>
+
+            <!-- Statistik Permainan (Nyawa Tabrak, Nyawa Soal, Skor, Waktu) -->
+            <div class="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm">
+                <!-- 10 Nyawa Tabrak -->
+                <div class="bg-emerald-950/70 border border-emerald-500/40 px-2.5 py-1.5 rounded-xl flex items-center gap-1.5" title="Sisa Nyawa Tabrakan Batu/Burung (Maks 10)">
+                    <span class="text-rose-400 text-base">❤️</span>
+                    <div>
+                        <div class="text-[10px] text-emerald-300 leading-none">Nyawa Dino</div>
+                        <div class="font-game font-bold text-white leading-tight"><span id="hud-lives">10</span> / 10</div>
+                    </div>
+                </div>
+
+                <!-- 3 Kesempatan Salah Soal -->
+                <div class="bg-emerald-950/70 border border-amber-400/50 px-2.5 py-1.5 rounded-xl flex items-center gap-1.5" title="Batas Salah Menjawab Soal (3x Salah = Kalah)">
+                    <span class="text-amber-400 text-base">🧠</span>
+                    <div>
+                        <div class="text-[10px] text-amber-200 leading-none">Salah Soal</div>
+                        <div class="font-game font-bold text-amber-300 leading-tight"><span id="hud-wrong">0</span> / 3</div>
+                    </div>
+                </div>
+
+                <!-- Progres Soal Terjawab -->
+                <div class="bg-emerald-950/70 border border-sky-400/40 px-2.5 py-1.5 rounded-xl flex items-center gap-1.5">
+                    <span class="text-sky-300 text-base">📚</span>
+                    <div>
+                        <div class="text-[10px] text-sky-200 leading-none">Soal Benar</div>
+                        <div class="font-game font-bold text-white leading-tight"><span id="hud-correct">0</span> / 100</div>
+                    </div>
+                </div>
+
+                <!-- Tombol Suara & Ganti Waktu -->
+                <div class="flex items-center gap-1.5">
+                    <button id="btn-toggle-time" onclick="toggleDayNightManual()" class="bg-white/15 hover:bg-white/25 p-2 rounded-xl text-sm transition" title="Ubah Suasana Pagi/Malam">
+                        <span id="icon-time">☀️</span>
+                    </button>
+                    <button id="btn-toggle-sound" onclick="toggleSound()" class="bg-white/15 hover:bg-white/25 p-2 rounded-xl text-sm transition" title="Suara Efek">
+                        <span id="icon-sound">🔊</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- AREA UTAMA GAME CANVAS -->
+    <main class="flex-1 flex flex-col items-center justify-center p-2 sm:p-4 relative">
+        <div id="game-wrapper" class="relative w-full max-w-6xl h-[340px] sm:h-[420px] md:h-[460px] rounded-3xl overflow-hidden shadow-2xl border-4 border-emerald-600/80 bg-sky-200">
+            <!-- Canvas Permainan -->
+            <canvas id="gameCanvas"></canvas>
+
+            <!-- Indikator Kuis Berikutnya (Progress Bar kecil di pojok atas canvas) -->
+            <div id="quiz-timer-badge" class="hidden absolute top-3 left-3 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-md border border-emerald-200 flex items-center gap-2 text-xs font-bold text-emerald-900">
+                <span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping"></span>
+                <span>Soal berikutnya dalam: <span id="next-quiz-countdown" class="text-emerald-700 font-game">5</span>s</span>
+            </div>
+
+            <!-- Indikator Suasana Pagi/Malam di Pojok Kanan Canvas -->
+            <div id="time-badge" class="absolute top-3 right-3 bg-slate-900/60 backdrop-blur-sm text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5">
+                <span id="time-badge-icon">🌤️</span>
+                <span id="time-badge-text">Suasana Pagi</span>
+            </div>
+
+            <!-- LAYAR MULAI (START OVERLAY) -->
+            <div id="start-overlay" class="absolute inset-0 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4 z-10">
+                <div class="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-7 text-center shadow-2xl border-4 border-amber-400 animate-pop">
+                    <div class="inline-flex items-center gap-2 bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-xs font-bold mb-2">
+                        🏫 SDIT GEMA INSAN MANDIRI
+                    </div>
+                    <h2 class="font-game text-2xl sm:text-3xl font-bold text-slate-800 mb-2">
+                        Petualangan Dino Informatika
+                    </h2>
+                    <p class="text-slate-600 text-xs sm:text-sm mb-4 leading-relaxed">
+                        Bantu Dino melompati batu dan burung sambil menjawab <strong>100 soal acak</strong> materi Sistem Komputer & Jaringan Internet!
+                    </p>
+
+                    <!-- Kotak Aturan Main -->
+                    <div class="bg-slate-50 rounded-2xl p-3.5 text-left text-xs sm:text-sm space-y-2 mb-5 border border-slate-200">
+                        <div class="flex items-start gap-2">
+                            <span>❤️</span>
+                            <span><strong>10 Nyawa Tabrakan:</strong> Hati-hati menabrak batu atau burung (10x tabrak = kalah).</span>
+                        </div>
+                        <div class="flex items-start gap-2">
+                            <span>🧠</span>
+                            <span><strong>Maksimal 3x Salah Soal:</strong> Jika salah menjawab 3 soal, permainan langsung berakhir!</span>
+                        </div>
+                        <div class="flex items-start gap-2">
+                            <span>⏱️</span>
+                            <span><strong>Waktu 10 Detik per Soal:</strong> Jawab <b>Benar</b> sebelum waktu habis untuk langsung lanjut berlari. Jika <b>Salah/Waktu Habis</b>, muncul penjelasan materi.</span>
+                        </div>
+                    </div>
+
+                    <button onclick="startGame()" class="btn-game w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-game font-bold text-lg tracking-wide cursor-pointer">
+                        🚀 MULAI MAIN
+                    </button>
+                </div>
+            </div>
+
+            <!-- LAYAR GAME OVER / MENANG -->
+            <div id="gameover-overlay" class="hidden absolute inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-30">
+                <div class="bg-white rounded-3xl max-w-md w-full p-6 text-center shadow-2xl border-4 border-rose-500 animate-pop" id="gameover-card">
+                    <div id="gameover-emoji" class="text-5xl mb-2">😢</div>
+                    <h2 id="gameover-title" class="font-game text-2xl sm:text-3xl font-bold text-rose-600 mb-1">
+                        PERMAINAN BERAKHIR!
+                    </h2>
+                    <p id="gameover-reason" class="text-sm font-semibold text-slate-700 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 mb-4">
+                        Kamu sudah 3 kali salah menjawab soal!
+                    </p>
+
+                    <!-- Ringkasan Skor -->
+                    <div class="grid grid-cols-3 gap-2 mb-5">
+                        <div class="bg-emerald-50 border border-emerald-200 p-2.5 rounded-2xl">
+                            <div class="text-[11px] text-emerald-700 font-semibold">Soal Benar</div>
+                            <div id="final-correct" class="font-game text-xl font-bold text-emerald-800">0</div>
+                        </div>
+                        <div class="bg-rose-50 border border-rose-200 p-2.5 rounded-2xl">
+                            <div class="text-[11px] text-rose-700 font-semibold">Soal Salah</div>
+                            <div id="final-wrong" class="font-game text-xl font-bold text-rose-800">0</div>
+                        </div>
+                        <div class="bg-amber-50 border border-amber-200 p-2.5 rounded-2xl">
+                            <div class="text-[11px] text-amber-700 font-semibold">Sisa Nyawa</div>
+                            <div id="final-lives" class="font-game text-xl font-bold text-amber-800">10</div>
+                        </div>
+                    </div>
+
+                    <button onclick="startGame()" class="btn-game w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-game font-bold text-lg cursor-pointer">
+                        🔄 MAIN LAGI (ACAK SOAL BARU)
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- TOMBOL KONTROL DI LUAR CANVAS (Untuk Layar Sentuh / HP / Tablet & Mouse) -->
+        <div class="w-full max-w-6xl mt-3 flex items-center justify-between gap-3 px-1">
+            <div class="hidden sm:flex items-center gap-2 text-xs text-slate-300 bg-slate-800/80 px-3.5 py-2 rounded-xl border border-slate-700">
+                <span>⌨️ Kontrol Keyboard:</span>
+                <kbd class="bg-slate-700 px-2 py-0.5 rounded text-amber-300 font-mono">SPASI / ↑</kbd> Lompat
+                <span class="mx-1">•</span>
+                <kbd class="bg-slate-700 px-2 py-0.5 rounded text-amber-300 font-mono">↓</kbd> Menunduk
+            </div>
+
+            <div class="flex-1 sm:flex-initial flex items-center justify-center gap-3 w-full sm:w-auto">
+                <button id="btn-duck" onmousedown="setDuck(true)" onmouseup="setDuck(false)" onmouseleave="setDuck(false)" ontouchstart="handleTouchDuck(event, true)" ontouchend="handleTouchDuck(event, false)" class="btn-game flex-1 sm:flex-initial sm:w-40 py-3 px-4 rounded-2xl bg-sky-600 hover:bg-sky-500 text-white font-game font-bold text-base flex items-center justify-center gap-2 cursor-pointer">
+                    <span>⬇️</span> MENUNDUK
+                </button>
+                <button id="btn-jump" onmousedown="triggerJump()" ontouchstart="handleTouchJump(event)" class="btn-game flex-1 sm:flex-initial sm:w-44 py-3 px-4 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-game font-bold text-base flex items-center justify-center gap-2 cursor-pointer">
+                    <span>⬆️</span> LOMPAT
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- MODAL SOAL KUIS (MUNCUL SAAT WAKTU KUIS TIBA) -->
+    <div id="quiz-modal" class="hidden fixed inset-0 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-40">
+        <div class="bg-white rounded-3xl max-w-xl w-full p-5 sm:p-6 shadow-2xl border-4 border-emerald-500 animate-pop max-h-[92vh] overflow-y-auto">
+            <!-- Header Soal: Hanya Menampilkan Nama Bab & Timer 10 Detik (Tanpa Nomor Urut Soal) -->
+            <div class="flex items-center justify-between gap-2 mb-2.5">
+                <span id="quiz-category" class="bg-emerald-100 text-emerald-800 text-xs sm:text-sm font-extrabold px-3.5 py-1.5 rounded-full border border-emerald-300">
+                    BAB 3: Sistem Komputer
+                </span>
+                <div id="quiz-timer-pill" class="flex items-center gap-1.5 bg-emerald-50 border border-emerald-300 text-emerald-800 px-3 py-1 rounded-full font-game font-bold text-xs sm:text-sm">
+                    <span>⏱️</span>
+                    <span id="quiz-time-left">10</span><span>d</span>
+                </div>
+            </div>
+
+            <!-- Progress Bar Waktu 10 Detik -->
+            <div class="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden mb-4 border border-slate-300/70">
+                <div id="quiz-timer-bar" class="h-full bg-emerald-500 transition-all duration-100 ease-linear" style="width: 100%;"></div>
+            </div>
+
+            <!-- Teks Pertanyaan -->
+            <h3 id="quiz-question" class="text-base sm:text-lg font-bold text-slate-800 mb-4 leading-snug">
+                Pertanyaan akan muncul di sini...
+            </h3>
+
+            <!-- Pilihan Jawaban (A, B, C, D) -->
+            <div id="quiz-options" class="space-y-2.5">
+                <!-- Diisi secara dinamis melalui JavaScript -->
+            </div>
+
+            <!-- KOTAK PENJELASAN (HANYA MUNCUL JIKA JAWABAN SALAH ATAU WAKTU HABIS!) -->
+            <div id="wrong-feedback-box" class="hidden mt-4 bg-rose-50 border-2 border-rose-300 rounded-2xl p-4 animate-pop">
+                <div class="flex items-center gap-2 text-rose-700 font-bold text-sm sm:text-base mb-1">
+                    <span id="wrong-feedback-title">❌ Jawaban Kamu Kurang Tepat!</span>
+                    <span class="ml-auto text-xs bg-rose-200 text-rose-900 px-2 py-0.5 rounded-full">
+                        Salah: <span id="feedback-wrong-count">1</span>/3
+                    </span>
+                </div>
+                <p class="text-xs sm:text-sm text-slate-700 mb-1.5">
+                    <strong>Jawaban yang benar:</strong> <span id="correct-answer-text" class="text-emerald-700 font-bold"></span>
+                </p>
+                <div class="bg-white/90 rounded-xl p-3 text-xs sm:text-sm text-slate-700 border border-rose-200 leading-relaxed">
+                    <strong>💡 Penjelasan:</strong> <span id="explanation-text"></span>
+                </div>
+                <button id="btn-continue-after-wrong" onclick="continueAfterWrong()" class="btn-game mt-3.5 w-full py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-game font-bold text-sm sm:text-base cursor-pointer">
+                    LANJUT BERLARI ➡️
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // =========================================================================
+        // 1. BANK 100 SOAL INFORMATIKA KELAS 4 (BAB 3 & BAB 4)
+        // Properti: bab ("BAB 3: Sistem Komputer" / "BAB 4: Jaringan Komputer & Internet"), q, opts, ans, exp
+        // =========================================================================
+        const QUESTION_BANK = [
+            // --- BAB 3: SISTEM KOMPUTER (HARDWARE, SOFTWARE, BRAINWARE) (50 SOAL) ---
+            { bab: "BAB 3: Sistem Komputer", q: "Tiga komponen utama yang membentuk sistem komputer adalah...", opts: ["Hardware, Software, dan Brainware", "Monitor, Mouse, dan Meja", "Windows, Linux, dan Kursi", "Internet, Wi-Fi, dan Kabel"], ans: 0, exp: "Sistem komputer terdiri dari tiga komponen yang saling berkaitan, yaitu Hardware (perangkat keras), Software (perangkat lunak), dan Brainware (pengguna)." },
+            { bab: "BAB 3: Sistem Komputer", q: "Perangkat komputer yang memiliki bentuk fisik, dapat dilihat, dan dapat disentuh disebut...", opts: ["Software", "Hardware", "Brainware", "Freeware"], ans: 1, exp: "Hardware atau perangkat keras adalah komponen fisik komputer yang bisa dilihat dan disentuh secara langsung, seperti monitor, keyboard, dan mouse." },
+            { bab: "BAB 3: Sistem Komputer", q: "Perangkat lunak atau sekumpulan data digital yang berisi perintah dalam komputer disebut...", opts: ["Hardware", "Brainware", "Software", "Processor"], ans: 2, exp: "Software (perangkat lunak) adalah program atau data digital yang dibuat untuk melaksanakan perintah tertentu di dalam komputer." },
+            { bab: "BAB 3: Sistem Komputer", q: "Manusia yang menggunakan, mengoperasikan, atau membuat program komputer disebut...", opts: ["Hardware", "Software", "Brainware", "Malware"], ans: 2, exp: "Brainware adalah user atau pengguna komputer, termasuk siswa, guru, teknisi, operator, maupun programmer." },
+            { bab: "BAB 3: Sistem Komputer", q: "Berikut ini yang merupakan contoh perangkat masukan (input device) adalah...", opts: ["Printer dan Speaker", "Mouse dan Keyboard", "Monitor dan Proyektor", "Harddisk dan Flashdisk"], ans: 1, exp: "Mouse dan keyboard berfungsi memasukkan perintah atau data ke dalam komputer sehingga termasuk input device (perangkat masukan)." },
+            { bab: "BAB 3: Sistem Komputer", q: "Alat yang berfungsi untuk memindai (menyalin) dokumen kertas menjadi file digital di komputer adalah...", opts: ["Printer", "Scanner", "Speaker", "Monitor"], ans: 1, exp: "Scanner adalah perangkat masukan (input device) yang berfungsi memindai gambar atau dokumen fisik menjadi data digital." },
+            { bab: "BAB 3: Sistem Komputer", q: "Perangkat keras yang berfungsi sebagai otak komputer untuk memproses data adalah...", opts: ["Processor", "Monitor", "Mouse", "Flashdisk"], ans: 0, exp: "Processor termasuk processing device (perangkat proses) yang menjadi otak pemrosesan data pada komputer." },
+            { bab: "BAB 3: Sistem Komputer", q: "Contoh perangkat keras yang berfungsi sebagai media penyimpanan (memori) adalah...", opts: ["Harddisk dan Flashdisk", "Keyboard dan Mouse", "Printer dan Scanner", "Speaker dan Mikrofon"], ans: 0, exp: "Harddisk dan flashdisk digunakan untuk menyimpan data dan file pada komputer sehingga disebut media penyimpanan (memori)." },
+            { bab: "BAB 3: Sistem Komputer", q: "Perangkat keluaran (output device) yang berfungsi mencetak tulisan atau gambar ke atas kertas adalah...", opts: ["Scanner", "Printer", "Mouse", "Keyboard"], ans: 1, exp: "Printer adalah perangkat keluaran (output device) yang mencetak dokumen digital dari komputer ke media kertas." },
+            { bab: "BAB 3: Sistem Komputer", q: "Alat yang berfungsi menampilkan gambar atau tampilan antarmuka komputer agar bisa dilihat pengguna adalah...", opts: ["Monitor", "CPU", "Speaker", "Flashdisk"], ans: 0, exp: "Monitor adalah perangkat keluaran (output device) yang menampilkan hasil pemrosesan komputer dalam bentuk visual di layar." },
+            { bab: "BAB 3: Sistem Komputer", q: "Perangkat keluaran yang digunakan untuk mendengarkan suara atau musik dari komputer adalah...", opts: ["Scanner", "Speaker aktif", "Keyboard", "Mouse"], ans: 1, exp: "Speaker aktif mengeluarkan sinyal suara dari komputer sehingga termasuk perangkat keluaran (output device)." },
+            { bab: "BAB 3: Sistem Komputer", q: "Papan ketik pada komputer yang berisi tombol huruf, angka, dan simbol disebut...", opts: ["Mouse", "Keyboard", "Monitor", "Touchpad"], ans: 1, exp: "Keyboard adalah papan ketik yang digunakan untuk mengetik huruf, angka, dan simbol ke dalam komputer." },
+            { bab: "BAB 3: Sistem Komputer", q: "Perangkat keras yang digerakkan dengan tangan untuk mengarahkan kursor dan mengklik ikon di layar adalah...", opts: ["Mouse", "Printer", "Speaker", "Harddisk"], ans: 0, exp: "Mouse berfungsi menggerakkan kursor/penunjuk di layar monitor untuk memilih atau mengklik menu." },
+            { bab: "BAB 3: Sistem Komputer", q: "Kamera webcam pada laptop atau komputer termasuk dalam kelompok perangkat...", opts: ["Output device", "Input device", "Memori", "Software"], ans: 1, exp: "Kamera menangkap gambar atau video dari luar untuk dimasukkan ke komputer, sehingga termasuk input device." },
+            { bab: "BAB 3: Sistem Komputer", q: "Perangkat lunak dasar yang mengatur perintah dan mengontrol seluruh proses dalam komputer disebut...", opts: ["Program Aplikasi", "Sistem Operasi", "Browser", "Brainware"], ans: 1, exp: "Sistem operasi (Operating System) adalah software utama yang mengatur dan mengontrol kerja perangkat keras dan aplikasi." },
+            { bab: "BAB 3: Sistem Komputer", q: "Sistem operasi yang tampilan antarmukanya menyerupai kotak jendela dan paling banyak digunakan adalah...", opts: ["Microsoft Windows", "Adobe Photoshop", "Microsoft Word", "Google Chrome"], ans: 0, exp: "Microsoft Windows memiliki antarmuka berbentuk jendela (windows) dan menjadi sistem operasi yang sangat populer." },
+            { bab: "BAB 3: Sistem Komputer", q: "Berikut ini yang merupakan contoh versi sistem operasi Microsoft Windows adalah...", opts: ["Windows 7, Windows 8, Windows 10", "Windows Word, Excel, PowerPoint", "Windows Chrome, Edge, Firefox", "Windows Zoom, Meet, Drive"], ans: 0, exp: "Windows 7, Windows 8, dan Windows 10 adalah versi dari sistem operasi Microsoft Windows." },
+            { bab: "BAB 3: Sistem Komputer", q: "Sistem operasi yang dapat digunakan secara bebas tanpa berbayar dan dapat dimodifikasi pengguna adalah...", opts: ["Microsoft Windows", "Linux", "Microsoft Office", "Adobe Photoshop"], ans: 1, exp: "Linux adalah sistem operasi bersifat terbuka (open source) yang dapat digunakan gratis tanpa berbayar dan dimodifikasi." },
+            { bab: "BAB 3: Sistem Komputer", q: "Sistem operasi yang dikembangkan secara bersama-sama dan dapat berjalan sebagai server maupun workstation adalah...", opts: ["Unix", "Paint", "Photoshop", "Zoom"], ans: 0, exp: "Unix adalah sistem operasi yang mampu menjalankan banyak perintah bersamaan serta bisa menjadi server maupun workstation." },
+            { bab: "BAB 3: Sistem Komputer", q: "Program yang dibuat untuk memenuhi kebutuhan aktivitas manusia di bidang tertentu disebut...", opts: ["Program Aplikasi", "Hardware", "Sistem Operasi", "Brainware"], ans: 0, exp: "Program aplikasi adalah perangkat lunak yang dirancang khusus untuk membantu pekerjaan manusia, seperti mengetik atau mengedit foto." },
+            { bab: "BAB 3: Sistem Komputer", q: "Aplikasi dalam paket Microsoft Office yang digunakan khusus untuk mengolah kata atau mengetik dokumen adalah...", opts: ["Microsoft Excel", "Microsoft Word", "Microsoft PowerPoint", "Adobe Photoshop"], ans: 1, exp: "Microsoft Word adalah program aplikasi pengolah kata yang digunakan untuk membuat surat, makalah, atau cerita." },
+            { bab: "BAB 3: Sistem Komputer", q: "Program aplikasi dalam Microsoft Office yang digunakan untuk mengolah data dan angka dalam tabel adalah...", opts: ["Microsoft Word", "Microsoft Excel", "Microsoft PowerPoint", "Microsoft Paint"], ans: 1, exp: "Microsoft Excel adalah aplikasi pengolah angka dan data berbentuk baris dan kolom (spreadsheet)." },
+            { bab: "BAB 3: Sistem Komputer", q: "Aplikasi dalam paket Microsoft Office yang digunakan untuk membuat slide presentasi adalah...", opts: ["Microsoft PowerPoint", "Microsoft Word", "Microsoft Excel", "Google Chrome"], ans: 0, exp: "Microsoft PowerPoint dirancang untuk membuat bahan presentasi berbentuk slide yang menarik." },
+            { bab: "BAB 3: Sistem Komputer", q: "Aplikasi yang dirancang khusus untuk mengedit foto atau mengolah gambar grafis seperti poster dan brosur adalah...", opts: ["Adobe Photoshop", "Microsoft Excel", "Windows Media Player", "Zoom"], ans: 0, exp: "Adobe Photoshop adalah program aplikasi pengolah gambar dan foto yang sering dipakai desainer grafis." },
+            { bab: "BAB 3: Sistem Komputer", q: "Aplikasi peramban (web browser) buatan perusahaan Google untuk menjelajah informasi di internet adalah...", opts: ["Google Chrome", "Adobe Photoshop", "Microsoft Word", "Linux"], ans: 0, exp: "Google Chrome adalah aplikasi web browser buatan Google untuk mencari dan membuka halaman di internet." },
+            { bab: "BAB 3: Sistem Komputer", q: "Aplikasi yang digunakan untuk berkomunikasi tatap muka secara daring (video conference) jarak jauh adalah...", opts: ["Zoom", "Microsoft Paint", "Adobe Photoshop", "Microsoft Excel"], ans: 0, exp: "Zoom adalah aplikasi komunikasi video yang memudahkan banyak orang bertatap muka dari tempat berbeda." },
+            { bab: "BAB 3: Sistem Komputer", q: "Seorang teknisi yang memperbaiki komputer yang rusak termasuk dalam komponen...", opts: ["Hardware", "Software", "Brainware", "Freeware"], ans: 2, exp: "Teknisi adalah manusia yang menangani perangkat komputer, sehingga termasuk kategori Brainware." },
+            { bab: "BAB 3: Sistem Komputer", q: "Orang yang bertugas membuat program atau aplikasi komputer disebut...", opts: ["Programmer", "Printer", "Processor", "Scanner"], ans: 0, exp: "Programmer adalah ahli yang menulis kode untuk membuat aplikasi/software, dan termasuk bagian dari Brainware." },
+            { bab: "BAB 3: Sistem Komputer", q: "Benda berikut yang BUKAN merupakan perangkat keras (hardware) komputer adalah...", opts: ["Monitor", "Meja dan Kursi", "Mouse", "Speaker"], ans: 1, exp: "Meja dan kursi adalah perabot ruangan, bukan komponen perangkat keras (hardware) sistem komputer." },
+            { bab: "BAB 3: Sistem Komputer", q: "Andika menekan tombol On/Off pada laptop untuk menyalakannya, lalu mengetik tugas sekolah. Peran Andika adalah sebagai...", opts: ["Software", "Hardware", "Brainware", "Sistem Operasi"], ans: 2, exp: "Andika adalah pengguna (user) yang mengoperasikan laptop, sehingga Andika berperan sebagai Brainware." },
+            { bab: "BAB 3: Sistem Komputer", q: "Aplikasi bawaan Windows yang biasa digunakan untuk membuka dan melihat file foto di komputer adalah...", opts: ["Windows Photo Viewer", "Microsoft Excel", "Google Drive", "Zoom"], ans: 0, exp: "Windows Photo Viewer adalah aplikasi untuk menampilkan dan melihat file gambar/foto di sistem operasi Windows." },
+            { bab: "BAB 3: Sistem Komputer", q: "Manakah di bawah ini yang semuanya termasuk perangkat lunak (software)?", opts: ["Microsoft Word, Firefox, dan Photoshop", "Monitor, Keyboard, dan Linux", "Mouse, Printer, dan Windows 10", "Flashdisk, Harddisk, dan Zoom"], ans: 0, exp: "Microsoft Word, Mozilla Firefox, dan Adobe Photoshop semuanya adalah program aplikasi (software)." },
+            { bab: "BAB 3: Sistem Komputer", q: "Jika komputer memiliki hardware lengkap tetapi tidak memiliki software sama sekali, maka komputer tersebut...", opts: ["Tidak dapat menjalankan perintah pengguna", "Dapat mengetik sendiri dengan cepat", "Bisa langsung terhubung ke internet", "Akan berubah menjadi lebih ringan"], ans: 0, exp: "Tanpa software (terutama sistem operasi), perangkat keras komputer tidak dapat menerima perintah atau dijalankan." },
+            { bab: "BAB 3: Sistem Komputer", q: "Berikut ini yang merupakan perangkat lunak peramban web (web browser) adalah...", opts: ["Microsoft Edge dan Mozilla Firefox", "Microsoft Word dan Excel", "Printer dan Scanner", "Windows 7 dan Unix"], ans: 0, exp: "Microsoft Edge dan Mozilla Firefox adalah contoh aplikasi web browser untuk menjelajah internet." },
+            { bab: "BAB 3: Sistem Komputer", q: "Aplikasi sederhana di komputer yang biasa digunakan siswa SD untuk menggambar dan mewarnai adalah...", opts: ["Microsoft Paint", "Microsoft Excel", "Google Drive", "Unix"], ans: 0, exp: "Microsoft Paint adalah program aplikasi pengolah gambar sederhana bawaan Windows." },
+            { bab: "BAB 3: Sistem Komputer", q: "Bentuk media penyimpanan kecil yang mudah dibawa ke mana-mana dan dicolokkan ke port USB adalah...", opts: ["Flashdisk", "Monitor", "Scanner", "Printer"], ans: 0, exp: "Flashdisk adalah memori eksternal berukuran kecil dan praktis untuk menyimpan serta memindahkan data." },
+            { bab: "BAB 3: Sistem Komputer", q: "Guru yang menggunakan komputer untuk mengajar di kelas dan siswa yang belajar menggunakan laptop termasuk...", opts: ["Brainware", "Hardware", "Software", "Malware"], ans: 0, exp: "Siapa pun manusia yang mengoperasikan komputer untuk belajar, mengajar, atau bekerja disebut Brainware." },
+            { bab: "BAB 3: Sistem Komputer", q: "Kegunaan utama memori (seperti harddisk) pada komputer adalah untuk...", opts: ["Menyimpan data, dokumen, dan program", "Mencetak gambar ke kertas", "Menggerakkan kursor di layar", "Mengeluarkan suara musik"], ans: 0, exp: "Memori berfungsi menyimpan berbagai data digital, foto, dokumen, maupun sistem operasi pada komputer." },
+            { bab: "BAB 3: Sistem Komputer", q: "Dalam paket Microsoft Office, program yang digunakan untuk mengelola surat elektronik (email) adalah...", opts: ["Microsoft Outlook", "Microsoft Paint", "Microsoft Visio", "Adobe Photoshop"], ans: 0, exp: "Microsoft Outlook adalah bagian dari Microsoft Office yang berfungsi mengelola email dan jadwal." },
+            { bab: "BAB 3: Sistem Komputer", q: "Urutan kerja sistem komputer yang tepat saat Andika mengetik tugas hingga dicetak adalah...", opts: ["Input (Keyboard) → Proses (CPU) → Output (Monitor/Printer)", "Output (Printer) → Input (Mouse) → Proses (CPU)", "Proses (CPU) → Output (Keyboard) → Input (Monitor)", "Input (Monitor) → Proses (Printer) → Output (Mouse)"], ans: 0, exp: "Data dimasukkan lewat perangkat input (keyboard), diolah di CPU/processor, lalu ditampilkan di monitor atau dicetak di printer." },
+            { bab: "BAB 3: Sistem Komputer", q: "Headphone atau headset yang dipasang di telinga untuk mendengar suara dari komputer termasuk perangkat...", opts: ["Output device", "Input device", "Processing device", "Sistem operasi"], ans: 0, exp: "Headphone mengeluarkan suara dari komputer ke telinga pengguna sehingga termasuk perangkat keluaran (output device)." },
+            { bab: "BAB 3: Sistem Komputer", q: "Tombol khusus pada komputer atau laptop yang ditekan pertama kali untuk menghidupkan perangkat adalah tombol...", opts: ["Power (On/Off)", "Enter", "Backspace", "Spacebar"], ans: 0, exp: "Tombol Power (On/Off) berfungsi mengalirkan daya untuk menyalakan atau mematikan komputer/laptop." },
+            { bab: "BAB 3: Sistem Komputer", q: "Software sistem operasi Linux dikembangkan dari sistem operasi pendahulunya yang bernama...", opts: ["Unix", "Android", "Photoshop", "Office"], ans: 0, exp: "Linux merupakan sistem operasi yang dikembangkan berdasarkan sistem operasi Unix." },
+            { bab: "BAB 3: Sistem Komputer", q: "Perangkat keras yang bentuknya seperti tabung atau kotak datar di meja yang memutar piringan CD/DVD adalah...", opts: ["CD/DVD ROM Drive", "Mouse", "Speaker", "Keyboard"], ans: 0, exp: "CD/DVD Drive adalah perangkat keras pembaca dan penulis data pada kepingan cakram CD atau DVD." },
+            { bab: "BAB 3: Sistem Komputer", q: "Manakah pernyataan yang SALAH mengenai sistem komputer?", opts: ["User (pengguna) adalah bagian dari perangkat lunak", "Hardware adalah perangkat keras komputer", "Software membantu mengolah data sesuai perintah", "Microsoft Paint termasuk perangkat lunak"], ans: 0, exp: "User (pengguna) adalah manusia (Brainware), bukan perangkat lunak (Software)." },
+            { bab: "BAB 3: Sistem Komputer", q: "Kasir di minimarket yang mengoperasikan komputer kasir untuk menghitung belanjaan berperan sebagai...", opts: ["Brainware", "Software", "Hardware", "Server"], ans: 0, exp: "Kasir adalah operator komputer (manusia yang mengoperasikan komputer), sehingga termasuk Brainware." },
+            { bab: "BAB 3: Sistem Komputer", q: "Hasil pengolahan gambar dari aplikasi Adobe Photoshop biasanya dimanfaatkan untuk membuat...", opts: ["Poster, brosur, dan baliho", "Laporan keuangan otomatis", "Jaringan Wi-Fi sekolah", "Sistem operasi komputer"], ans: 0, exp: "Adobe Photoshop digunakan desainer grafis untuk mengolah foto menjadi poster, brosur, iklan, dan baliho." },
+            { bab: "BAB 3: Sistem Komputer", q: "Perangkat keras pada laptop yang berfungsi menggantikan fungsi mouse dengan cara mengusap jari adalah...", opts: ["Touchpad", "Webcam", "Speaker", "Processor"], ans: 0, exp: "Touchpad adalah papan sentuh pada laptop yang berfungsi menggerakkan kursor seperti mouse." },
+            { bab: "BAB 3: Sistem Komputer", q: "Sistem operasi berfungsi sebagai penghubung antara...", opts: ["Pengguna (Brainware) dengan perangkat keras (Hardware)", "Meja komputer dengan listrik", "Kertas printer dengan tinta", "Mouse dengan alas mouse"], ans: 0, exp: "Sistem operasi menerjemahkan perintah dari pengguna/aplikasi agar dapat dijalankan oleh perangkat keras komputer." },
+            { bab: "BAB 3: Sistem Komputer", q: "Agar lagu dari YouTube di komputer dapat terdengar jelas oleh seluruh teman di kelas, komputer perlu dihubungkan ke...", opts: ["Speaker aktif", "Scanner", "Printer", "Flashdisk"], ans: 0, exp: "Speaker aktif berfungsi mengeraskan suara keluaran dari komputer agar terdengar jelas." },
+
+            // --- BAB 4: JARINGAN KOMPUTER DAN INTERNET (50 SOAL) ---
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Jaringan komunikasi global yang menghubungkan jutaan komputer di seluruh dunia disebut...", opts: ["Internet", "Bluetooth", "Harddisk", "Microsoft Office"], ans: 0, exp: "Internet adalah jaringan komputer luas yang menghubungkan perangkat di seluruh dunia untuk bertukar informasi." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Teknologi jaringan lokal tanpa kabel (nirkabel) yang memungkinkan laptop atau HP terhubung ke internet adalah...", opts: ["Wi-Fi", "Kabel LAN", "Flashdisk", "Printer"], ans: 0, exp: "Wi-Fi (Wireless Fidelity) adalah jaringan tanpa kabel yang menghubungkan perangkat ke jaringan lokal atau internet." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Teknologi jaringan lokal jarak dekat yang sering digunakan untuk mengirim atau menerima file antar-HP adalah...", opts: ["Bluetooth", "Google Maps", "Gmail", "Adobe Photoshop"], ans: 0, exp: "Bluetooth digunakan untuk menghubungkan dua perangkat dalam jarak dekat guna mengirim atau menerima file tanpa kabel." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Kode akses atau kata sandi rahasia yang digunakan untuk mengamankan laptop, HP, atau akun email disebut...", opts: ["Password", "Username", "Browser", "Shortcut"], ans: 0, exp: "Password (kata sandi) adalah kode rahasia untuk melindungi perangkat dan data pribadi agar tidak dibuka orang lain." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Tujuan utama memasang password pada laptop, komputer, dan ponsel adalah...", opts: ["Menjaga keamanan file dan data agar tidak dicuri orang lain", "Membuat baterai cepat penuh", "Memperbesar ukuran layar monitor", "Menghapus semua aplikasi otomatis"], ans: 0, exp: "Password mencegah orang yang tidak berhak membuka perangkat sehingga data pribadi tetap aman." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Cara membuat password (kode akses) yang kuat dan aman adalah dengan menggunakan...", opts: ["Kombinasi huruf, angka, dan tanda baca/karakter", "Tanggal lahir saja agar mudah ditebak", "Angka 12345 saja", "Nama panggilan sendiri saja"], ans: 0, exp: "Password yang kuat menggabungkan huruf besar/kecil, angka, dan tanda baca (simbol) sehingga sulit ditebak." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Setelah selesai menggunakan akun email atau media sosial di komputer umum/sekolah, tindakan yang harus dilakukan adalah...", opts: ["Keluar (Sign Out / Log Out) dari semua akun", "Membiarkan akun tetap terbuka", "Menuliskan password di meja komputer", "Mematikan layar monitor saja tanpa log out"], ans: 0, exp: "Melakukan Sign Out (Log Out) mencegah orang berikutnya membuka atau menyalahgunakan akun kita." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Mengapa kita harus berhati-hati menggunakan jaringan Wi-Fi gratis di tempat umum seperti taman kota atau pusat jajan?", opts: ["Karena rawan terjadi pencurian data pribadi", "Karena Wi-Fi umum merusak keyboard", "Karena Wi-Fi umum membuat layar hitam", "Karena tidak bisa membuka Google"], ans: 0, exp: "Jaringan Wi-Fi publik tidak terenkripsi dengan ketat sehingga identitas perangkat dan data mudah diretas/dicuri." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Upaya keamanan yang sebaiknya dilakukan setelah memakai jaringan Wi-Fi di tempat umum adalah...", opts: ["Segera menghapus/melupakan (Forget) nama jaringan Wi-Fi tersebut", "Menyimpan otomatis selamanya", "Membagikan password ke orang asing", "Membiarkan Bluetooth terus terbuka"], ans: 0, exp: "Menghapus riwayat jaringan Wi-Fi umum mencegah perangkat terhubung otomatis dan melindungi identitas perangkat." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Jika kamu pernah memberitahukan password Wi-Fi rumah kepada orang lain, tindakan keamanan yang tepat adalah...", opts: ["Segera mengganti password Wi-Fi tersebut", "Membiarkannya saja seumur hidup", "Menghapus semua aplikasi di HP", "Mematikan monitor komputer"], ans: 0, exp: "Mengganti kode akses (password) secara berkala atau setelah diketahui orang lain menjaga keamanan jaringanmu." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Saat akan mengirim file menggunakan Bluetooth, hal yang harus diperhatikan demi keamanan adalah...", opts: ["Memastikan nama perangkat Bluetooth tujuan sudah benar", "Menerima semua file dari perangkat asing", "Menyalakan Bluetooth sepanjang hari di tempat ramai", "Mengirim data pribadi ke semua orang"], ans: 0, exp: "Pastikan nama perangkat Bluetooth tujuan benar dan hindari menerima file dari sumber tak dikenal." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Berikut ini merupakan manfaat positif penggunaan internet bagi siswa, KECUALI...", opts: ["Menyebarkan data pribadi kepada orang asing", "Mencari informasi materi pelajaran sekolah", "Belajar online bersama guru", "Berkomunikasi jarak jauh dengan keluarga"], ans: 0, exp: "Menyebarkan data pribadi di internet sangat berbahaya dan bukan merupakan manfaat yang baik." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Kak Rizal ingin mencari rute jalan dan alamat rumah Kak Danil melalui internet. Aplikasi yang tepat digunakan adalah...", opts: ["Google Maps", "Google Drive", "Microsoft Paint", "Adobe Photoshop"], ans: 0, exp: "Google Maps adalah layanan peta digital untuk mencari lokasi, alamat, dan petunjuk arah." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Layanan dari Google yang berfungsi untuk menyimpan file dokumen, foto, dan video secara online di awan (cloud) adalah...", opts: ["Google Drive", "Google Maps", "Google Chrome", "Windows Media Player"], ans: 0, exp: "Google Drive adalah media penyimpanan daring (cloud storage) milik Google untuk menyimpan berbagai file." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Layanan surat elektronik (email) dari Google yang digunakan untuk mengirim dan menerima pesan di internet adalah...", opts: ["Gmail", "Google Maps", "Paint", "Bluetooth"], ans: 0, exp: "Gmail (Google Mail) adalah layanan email dari Google untuk berkirim surat dan file melalui internet." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Ketika kamu membuka tautan dokumen di internet lalu muncul pesan 'Minta akses (Request access)', artinya...", opts: ["Akses ke file tersebut dibatasi oleh pemiliknya", "File tersebut sudah terhapus permanen", "Komputer kamu sedang kehabisan baterai", "Internet kamu sangat cepat"], ans: 0, exp: "Pesan 'Minta akses' menandakan pemilik dokumen membatasi izin buka sehingga kamu harus meminta izin terlebih dahulu." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Selain menggunakan password, ponsel pintar modern dapat diamankan dengan pengenal biometrik berupa...", opts: ["Sidik jari (fingerprint) dan pengenal wajah", "Warna casing HP", "Ukuran layar HP", "Nama operator seluler"], ans: 0, exp: "Banyak ponsel modern dilengkapi sensor sidik jari dan pengenal wajah (face unlock) untuk keamanan ekstra." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Saat anak-anak SD menggunakan internet untuk mengerjakan tugas sekolah, sebaiknya didampingi oleh...", opts: ["Orang tua atau guru", "Orang yang tidak dikenal", "Teman yang masih balita", "Tidak perlu pengawasan siapa pun"], ans: 0, exp: "Pendampingan orang tua atau guru membantu siswa mengakses situs yang aman dan bermanfaat." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Cara berkomunikasi yang SOPAN dan BENAR di dunia internet (etika digital) adalah...", opts: ["Menyapa terlebih dahulu dan berkata sopan", "Menulis seluruh kalimat dengan HURUF KAPITAL", "Menggunakan banyak tanda seru (!!!) di akhir kalimat", "Meminta uang kepada orang lain di internet"], ans: 0, exp: "Menyapa dengan ramah dan menggunakan bahasa sopan adalah etika berkomunikasi yang baik di internet." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Dalam etika berkomunikasi di internet, menulis pesan dengan HURUF BESAR SEMUA (CAPSLOCK) dianggap...", opts: ["Tidak sopan karena terkesan berteriak atau marah", "Sangat ramah dan lembut", "Tanda sedang bercanda", "Wajib dilakukan setiap mengirim pesan"], ans: 0, exp: "Menulis dengan huruf kapital seluruhnya di pesan teks diartikan sebagai nada tinggi atau berteriak." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Jika ada situs internet atau pesan di media sosial yang meminta data pribadi seperti alamat rumah dan password, sikap kita adalah...", opts: ["Menolak dan berhati-hati tidak memberikannya", "Langsung menuliskan semua data dengan jujur", "Membagikan password kepada admin situs", "Mengunduh semua file yang ditawarkan"], ans: 0, exp: "Kita harus waspada terhadap permintaan data pribadi di internet agar tidak disalahgunakan." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Apa yang harus kita hindari saat mengunduh (download) file atau aplikasi dari internet?", opts: ["Mengunduh dari situs yang tidak terpercaya", "Mengunduh materi pelajaran dari situs resmi sekolah", "Mengunduh gambar untuk tugas dengan izin guru", "Menggunakan web browser yang aman"], ans: 0, exp: "Situs tidak terpercaya sering menyisipkan virus atau malware berbahaya ke dalam file unduhan." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Aplikasi berikut ini yang digunakan untuk berkomunikasi dengan jaringan internet adalah...", opts: ["WhatsApp, Instagram, dan Google Classroom", "Microsoft Paint dan Notepad", "Kalkulator dan Jam", "Scanner dan Printer"], ans: 0, exp: "WhatsApp, Instagram, dan Google Classroom membutuhkan koneksi internet untuk berkomunikasi dan belajar." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Layanan pesan singkat bawaan telepon seluler yang tidak memerlukan kuota internet disebut...", opts: ["SMS (Short Message Service)", "WhatsApp", "Zoom", "Gmail"], ans: 0, exp: "SMS menggunakan jaringan pulsa seluler biasa sehingga tidak membutuhkan koneksi internet seperti WhatsApp." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Saat lupa password akun email dan ingin memulihkannya, sistem biasanya meminta konfirmasi melalui...", opts: ["Nomor handphone pemulihan atau email cadangan", "Nama hewan peliharaan tetangga", "Warna baju yang sedang dipakai", "Ukuran sepatu pengguna"], ans: 0, exp: "Nomor handphone aktif yang terdaftar digunakan untuk mengirim kode verifikasi saat memulihkan password." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Untuk berbelanja secara online dengan aman dan benar, pembeli harus menyertakan data pengiriman berupa...", opts: ["Nama penerima, alamat lengkap, dan nomor telepon", "Password email dan PIN ATM", "Foto kartu pelajar dan rapor", "Kode sandi Wi-Fi rumah"], ans: 0, exp: "Nama, alamat lengkap, dan nomor telepon diperlukan kurir untuk mengantar pesanan belanja online." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Perbedaan utama antara Wi-Fi dan Bluetooth terletak pada...", opts: ["Jangkauan jarak dan kecepatan transfer datanya", "Wi-Fi memakai kabel sedangkan Bluetooth memakai kertas", "Bluetooth untuk mencuci sedangkan Wi-Fi untuk memasak", "Keduanya hanya bisa dipakai di luar angkasa"], ans: 0, exp: "Wi-Fi memiliki jangkauan lebih luas dan kecepatan lebih tinggi untuk akses internet, sedangkan Bluetooth untuk jarak dekat." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Untuk membuka aplikasi Gmail dan Google Drive di laptop, syarat utamanya adalah laptop harus...", opts: ["Terhubung ke jaringan internet", "Terhubung ke printer berwarna", "Memiliki dua buah mouse", "Dipasang speaker besar"], ans: 0, exp: "Gmail dan Google Drive adalah layanan berbasis daring (online) sehingga memerlukan koneksi internet." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Di halaman awal Google Chrome terdapat kotak pencarian bertuliskan 'Search Google or type a URL' yang berfungsi untuk...", opts: ["Mencari informasi, berita, atau mengetik alamat situs web", "Mematikan komputer secara otomatis", "Mengedit foto menjadi hitam putih", "Menghapus seluruh file di harddisk"], ans: 0, exp: "Kotak pencarian Google digunakan untuk mencari berbagai informasi atau langsung menuju alamat website (URL)." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Agar keamanan akun tetap terjaga dalam jangka panjang, sebaiknya password diganti secara...", opts: ["Berkala (rutin setiap beberapa bulan)", "Tidak pernah diganti selamanya", "Setiap 5 detik sekali", "Hanya saat komputer rusak"], ans: 0, exp: "Mengganti password secara berkala mengurangi risiko akun dibobol oleh pihak yang tidak bertanggung jawab." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Tindakan yang SALAH dalam menjaga keamanan perangkat komputer dan internet adalah...", opts: ["Membagikan password Wi-Fi dan email ke semua orang", "Membuat password kombinasi huruf dan angka", "Meminta izin orang tua sebelum memakai laptop", "Log out setelah memakai komputer di lab sekolah"], ans: 0, exp: "Password bersifat rahasia dan tidak boleh dibagikan sembarangan kepada orang lain." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Alat elektronik berikut yang dapat terhubung ke jaringan internet melalui Wi-Fi adalah...", opts: ["Laptop, HP Android, dan Tablet", "Meja kayu dan papan tulis", "Buku tulis dan pensil warna", "Penggaris dan penghapus"], ans: 0, exp: "Laptop, smartphone (HP), dan tablet memiliki modul Wi-Fi sehingga dapat terhubung ke internet." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Dika ingin mencari informasi tempat wisata di Indonesia untuk tugas sekolah. Langkah pertama Dika di laptop adalah...", opts: ["Memastikan laptop terhubung Wi-Fi lalu membuka web browser", "Mencetak kertas kosong di printer", "Mematikan tombol power laptop", "Mencabut baterai laptop"], ans: 0, exp: "Untuk mencari informasi di internet, laptop harus tersambung ke internet (Wi-Fi) lalu membuka browser seperti Chrome." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Aplikasi pesan instan di HP dan laptop yang sering digunakan guru dan orang tua untuk berbagi info sekolah adalah...", opts: ["WhatsApp", "Microsoft Paint", "Adobe Photoshop", "Windows Photo Viewer"], ans: 0, exp: "WhatsApp adalah aplikasi komunikasi populer untuk mengirim pesan teks, gambar, dokumen, dan panggilan suara/video." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Jaringan komputer yang mencakup area terbatas seperti di dalam rumah, ruang kelas, atau gedung sekolah disebut...", opts: ["Jaringan Lokal (LAN / WLAN)", "Jaringan Antarplanet", "Jaringan Televisi Nasional", "Jaringan Pos Internasional"], ans: 0, exp: "Jaringan lokal menghubungkan perangkat-perangkat dalam satu area terbatas seperti rumah atau sekolah." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Contoh kombinasi password yang paling kuat di antara pilihan berikut adalah...", opts: ["GemaInsan#2026!", "12345678", "abcdefg", "password"], ans: 0, exp: "'GemaInsan#2026!' menggabungkan huruf kapital, huruf kecil, angka, dan simbol (# dan !) sehingga sangat kuat." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Ketika seseorang mengirim file lewat Bluetooth kepada kita, namun nama pengirimnya asing dan tidak dikenal, sebaiknya kita...", opts: ["Menolak (Decline) permintaan transfer file tersebut", "Langsung menerimanya dengan senang hati", "Mematikan layar HP tanpa menolak", "Mengirim balik foto keluarga kita"], ans: 0, exp: "Menolak file dari Bluetooth asing mencegah masuknya virus atau file berbahaya ke perangkat kita." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Selain melalui Google Search, siswa dapat mencari video pembelajaran lagu nasional 'Dari Sabang Sampai Merauke' melalui...", opts: ["YouTube", "Microsoft Excel", "Kalkulator", "Bluetooth"], ans: 0, exp: "YouTube adalah platform berbagi video di internet yang menyediakan banyak video edukasi dan lagu nasional." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Apa kepanjangan dari huruf 'W' pada istilah internet 'WWW' yang sering muncul di alamat situs web?", opts: ["World (World Wide Web)", "Windows", "Word", "Wireless"], ans: 0, exp: "WWW adalah singkatan dari World Wide Web, yaitu sistem informasi halaman web yang saling terhubung di internet." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Manakah perilaku penggunaan internet yang mencerminkan Profil Pelajar Pancasila yang mandiri dan bertanggung jawab?", opts: ["Mencari bahan belajar dengan izin orang tua dan tidak membuka situs terlarang", "Bermain game online terus-menerus sampai lupa waktu belajar", "Menyalin tugas teman tanpa membaca", "Menggunakan kata-kata kasar di kolom komentar"], ans: 0, exp: "Menggunakan internet secara bijak, meminta izin orang tua, dan fokus belajar adalah sikap pelajar yang bertanggung jawab." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Jika kamu melihat iklan promosi makanan dengan nomor WhatsApp di internet, informasi tersebut termasuk jenis informasi...", opts: ["Informasi komersial / iklan", "Informasi rahasia negara", "Sistem operasi komputer", "Perangkat keras jaringan"], ans: 0, exp: "Promosi produk barang atau jasa untuk tujuan jual beli disebut informasi komersial atau iklan." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Istilah 'Online' (daring) saat menggunakan komputer atau HP memiliki arti...", opts: ["Perangkat sedang terhubung ke jaringan internet", "Perangkat sedang dimatikan total", "Perangkat kehabisan ruang penyimpanan", "Perangkat tidak memiliki aplikasi"], ans: 0, exp: "Online (dalam jaringan) berarti perangkat aktif terhubung ke internet sehingga bisa mengakses layanan daring." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Untuk membatasi hak akses orang lain terhadap laptop pribadi kita, pengaturan yang tepat adalah...", opts: ["Mengaktifkan kunci layar dengan password/PIN", "Meletakkan laptop di tempat umum dalam keadaan menyala", "Menghapus semua password akun", "Menempelkan catatan password di layar laptop"], ans: 0, exp: "Mengunci layar dengan password membatasi hak akses sehingga hanya pemilik yang bisa membuka laptop." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Singkatan dari 'E-Book' yang sering dibaca siswa melalui internet adalah...", opts: ["Electronic Book (Buku Elektronik)", "Easy Book", "English Book", "Extra Book"], ans: 0, exp: "E-Book (Electronic Book) adalah buku dalam bentuk digital yang dapat dibaca melalui komputer, tablet, atau HP." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Kegiatan jual beli barang melalui aplikasi atau situs web di internet disebut...", opts: ["E-Commerce (Belanja Online)", "E-Mail", "Bluetooth", "Scanning"], ans: 0, exp: "E-Commerce adalah perdagangan elektronik atau aktivitas jual beli yang dilakukan melalui jaringan internet." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Tombol ikon bergambar gembok tertutup di sebelah alamat situs web pada browser menandakan bahwa...", opts: ["Situs web tersebut memiliki koneksi yang aman", "Situs web tersebut sedang rusak", "Komputer tidak terhubung internet", "Keyboard sedang terkunci"], ans: 0, exp: "Ikon gembok (HTTPS) menandakan komunikasi data antara browser dan situs web terenkripsi dengan aman." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Ketika mencari gambar budaya Indonesia di Google, tab menu yang diklik agar hanya muncul hasil berupa foto/gambar adalah...", opts: ["Gambar (Images)", "Peta (Maps)", "Berita (News)", "Belanja (Shopping)"], ans: 0, exp: "Tab 'Gambar' (Images) pada mesin pencari Google menyaring hasil pencarian khusus berbentuk gambar atau foto." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Mengapa kita tidak boleh menyalakan komputer terus-menerus siang dan malam tanpa digunakan?", opts: ["Boros energi listrik dan membuat komponen cepat panas/rusak", "Membuat internet menjadi lebih cepat", "Membuat file di harddisk bertambah banyak", "Menambah kapasitas RAM komputer"], ans: 0, exp: "Mematikan komputer saat tidak digunakan menghemat listrik dan menjaga keawetan komponen hardware." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Aplikasi dari Google yang berfungsi untuk membuat dan mengetik dokumen secara online langsung di browser adalah...", opts: ["Google Docs", "Google Maps", "Google Chrome", "Bluetooth"], ans: 0, exp: "Google Docs adalah aplikasi pengolah kata berbasis web dari Google yang tersimpan otomatis di Google Drive." },
+            { bab: "BAB 4: Jaringan Komputer & Internet", q: "Jika kamu mendapat pesan dari orang tak dikenal di internet yang menawarkan hadiah gratis dengan syarat mengirim foto kartu keluarga, kamu harus...", opts: ["Mengabaikannya dan segera melapor kepada orang tua/guru", "Segera memfoto kartu keluarga dan mengirimnya", "Memberikan nomor telepon semua anggota keluarga", "Mengklik semua tautan hadiah yang dikirim"], ans: 0, exp: "Tawaran hadiah mencurigakan yang meminta data keluarga adalah penipuan (phishing). Segera lapor orang tua/guru." }
+        ];
+
+        // =========================================================================
+        // 2. SISTEM AUDIO SINTESIS (WEB AUDIO API - TANPA FILE EKSTERNAL)
+        // =========================================================================
+        let audioCtx = null;
+        let soundEnabled = true;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playTone(type) {
+            if (!soundEnabled) return;
+            try {
+                initAudio();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                const now = audioCtx.currentTime;
+
+                if (type === 'jump') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(280, now);
+                    osc.frequency.exponentialRampToValueAtTime(620, now + 0.14);
+                    gain.gain.setValueAtTime(0.18, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                    osc.start(now);
+                    osc.stop(now + 0.15);
+                } else if (type === 'hit') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(160, now);
+                    osc.frequency.exponentialRampToValueAtTime(55, now + 0.25);
+                    gain.gain.setValueAtTime(0.25, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.26);
+                    osc.start(now);
+                    osc.stop(now + 0.26);
+                } else if (type === 'correct') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(523.25, now); // C5
+                    osc.frequency.setValueAtTime(659.25, now + 0.08); // E5
+                    osc.frequency.setValueAtTime(783.99, now + 0.16); // G5
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                } else if (type === 'wrong') {
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(220, now);
+                    osc.frequency.linearRampToValueAtTime(140, now + 0.3);
+                    gain.gain.setValueAtTime(0.16, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.32);
+                    osc.start(now);
+                    osc.stop(now + 0.32);
+                } else if (type === 'quiz') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(440, now);
+                    osc.frequency.setValueAtTime(587.33, now + 0.1);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
+                    osc.start(now);
+                    osc.stop(now + 0.22);
+                } else if (type === 'tick') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(880, now);
+                    gain.gain.setValueAtTime(0.08, now);
+                    gain.gain.exponentialRampToValueAtTime(0.005, now + 0.06);
+                    osc.start(now);
+                    osc.stop(now + 0.06);
+                }
+            } catch (e) {
+                // Abaikan jika browser memblokir audio
+            }
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            document.getElementById('icon-sound').textContent = soundEnabled ? '🔊' : '🔇';
+        }
+
+        // =========================================================================
+        // 3. VARIABEL UTAMA & STATUS PERMAINAN
+        // =========================================================================
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let gameState = 'START'; // 'START', 'PLAYING', 'QUIZ', 'GAMEOVER'
+        let animationFrameId = null;
+
+        // Aturan Nyawa & Soal
+        const MAX_COLLISION_LIVES = 10;
+        const MAX_WRONG_ANSWERS = 3;
+        let collisionLives = MAX_COLLISION_LIVES;
+        let wrongAnswersCount = 0;
+        let correctAnswersCount = 0;
+
+        // Antrean 100 Soal Acak (Fisher-Yates Shuffle agar 100% acak & tidak berulang)
+        let shuffledQuestions = [];
+        let currentQuestionIndex = 0;
+        let activeQuestion = null;
+        let activeOptionObjects = [];
+
+        // Timer kemunculan kuis saat berlari (setiap ~6.5 detik berlari muncul 1 soal)
+        const QUIZ_INTERVAL_SECONDS = 6.5;
+        let runTimeSinceLastQuiz = 0;
+        let lastTimestamp = 0;
+
+        // Timer 10 detik untuk menjawab setiap soal kuis
+        const QUESTION_TIME_LIMIT = 10;
+        let questionTimerInterval = null;
+        let questionTimeRemaining = QUESTION_TIME_LIMIT;
+
+        // Siklus Suasana Pagi & Malam (otomatis berganti setiap 25 detik)
+        const DAY_NIGHT_CYCLE_SECONDS = 25;
+        let dayNightTimer = 0;
+        let isNight = false;
+
+        // Fisika & Entitas Dunia Game
+        let groundY = 300;
+        let gameSpeed = 340; // piksel per detik
+        let distanceRun = 0;
+        let invulnerableTimer = 0; // Kebal sesaat setelah menabrak (1.5 detik)
+
+        const dino = {
+            x: 80,
+            y: 246,
+            width: 48,
+            height: 54,
+            duckHeight: 32,
+            vy: 0,
+            gravity: 1750,
+            jumpForce: -660,
+            isGrounded: true,
+            isDucking: false,
+            legFrame: 0
+        };
+
+        let obstacles = [];
+        let obstacleSpawnTimer = 0;
+        let quizItems = []; // Bintang/Buku emas kuis di jalur lari
+        let quizItemSpawnTimer = 4.2;
+        let clouds = [];
+        let stars = [];
+        let floatingTexts = [];
+
+        // Helper aman untuk menggambar persegi panjang sudut membulat (kompatibel semua browser)
+        function drawRoundRect(ctx, x, y, w, h, r) {
+            const radius = Math.min(r, w / 2, h / 2);
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.arcTo(x + w, y, x + w, y + h, radius);
+            ctx.arcTo(x + w, y + h, x, y + h, radius);
+            ctx.arcTo(x, y + h, x, y, radius);
+            ctx.arcTo(x, y, x + w, y, radius);
+            ctx.closePath();
+        }
+
+        // =========================================================================
+        // 4. INISIALISASI CANVAS RESPONSIF & DEKORASI LATAR
+        // =========================================================================
+        function resizeCanvas() {
+            const wrapper = document.getElementById('game-wrapper');
+            if (!wrapper) return;
+            const w = wrapper.clientWidth || window.innerWidth || 800;
+            const h = wrapper.clientHeight || 400;
+            canvas.width = w;
+            canvas.height = h;
+            groundY = Math.max(180, canvas.height - 58);
+
+            // Sesuaikan posisi horizontal Dino untuk layar kecil vs besar
+            dino.x = canvas.width < 500 ? 42 : 85;
+            const activeH = dino.isDucking ? dino.duckHeight : dino.height;
+            if (dino.isGrounded || isNaN(dino.y)) {
+                dino.y = groundY - activeH;
+            }
+        }
+
+        function initEnvironmentDecor() {
+            clouds = [];
+            for (let i = 0; i < 6; i++) {
+                clouds.push({
+                    x: Math.random() * canvas.width,
+                    y: 35 + Math.random() * 95,
+                    scale: 0.65 + Math.random() * 0.55,
+                    speed: 18 + Math.random() * 20
+                });
+            }
+            stars = [];
+            for (let i = 0; i < 45; i++) {
+                stars.push({
+                    x: Math.random() * 1400,
+                    y: 15 + Math.random() * 180,
+                    size: 1.2 + Math.random() * 2.2,
+                    twinkle: Math.random() * Math.PI * 2
+                });
+            }
+        }
+
+        // =========================================================================
+        // 5. PENGACAKAN 100 SOAL (FISHER-YATES SHUFFLE)
+        // =========================================================================
+        function prepareShuffledQuestions() {
+            // Salin seluruh 100 soal lalu acak urutannya secara merata
+            shuffledQuestions = QUESTION_BANK.map((item, idx) => ({ ...item, originalId: idx + 1 }));
+            for (let i = shuffledQuestions.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffledQuestions[i], shuffledQuestions[j]] = [shuffledQuestions[j], shuffledQuestions[i]];
+            }
+            currentQuestionIndex = 0;
+        }
+
+        // =========================================================================
+        // 6. KONTROL PEMAIN (LOMPAT & MENUNDUK)
+        // =========================================================================
+        function triggerJump() {
+            if (gameState !== 'PLAYING') return;
+            if (dino.isGrounded) {
+                dino.vy = dino.jumpForce;
+                dino.isGrounded = false;
+                dino.isDucking = false;
+                playTone('jump');
+            }
+        }
+
+        function setDuck(ducking) {
+            if (gameState !== 'PLAYING') return;
+            dino.isDucking = ducking;
+            if (dino.isGrounded) {
+                dino.y = groundY - (dino.isDucking ? dino.duckHeight : dino.height);
+            }
+        }
+
+        function handleTouchJump(e) {
+            e.preventDefault();
+            triggerJump();
+        }
+
+        function handleTouchDuck(e, state) {
+            e.preventDefault();
+            setDuck(state);
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (gameState === 'PLAYING') {
+                if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
+                    e.preventDefault();
+                    triggerJump();
+                } else if (e.code === 'ArrowDown' || e.code === 'KeyS') {
+                    e.preventDefault();
+                    setDuck(true);
+                }
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'ArrowDown' || e.code === 'KeyS') {
+                setDuck(false);
+            }
+        });
+
+        // Ketuk langsung pada area canvas untuk melompat (memudahkan pengguna HP)
+        canvas.addEventListener('mousedown', (e) => {
+            if (gameState === 'PLAYING') triggerJump();
+        });
+        canvas.addEventListener('touchstart', (e) => {
+            if (gameState === 'PLAYING') {
+                e.preventDefault();
+                triggerJump();
+            }
+        }, { passive: false });
+
+        // =========================================================================
+        // 7. LOGIKA MULAI, UPDATE HUD, DAN GANTI PAGI/MALAM
+        // =========================================================================
+        function updateHUD() {
+            document.getElementById('hud-lives').textContent = collisionLives;
+            document.getElementById('hud-wrong').textContent = wrongAnswersCount;
+            document.getElementById('hud-correct').textContent = correctAnswersCount;
+        }
+
+        function updateTimeUI() {
+            const iconTime = document.getElementById('icon-time');
+            const badgeIcon = document.getElementById('time-badge-icon');
+            const badgeText = document.getElementById('time-badge-text');
+
+            if (isNight) {
+                iconTime.textContent = '🌙';
+                badgeIcon.textContent = '🌙';
+                badgeText.textContent = 'Suasana Malam';
+            } else {
+                iconTime.textContent = '☀️';
+                badgeIcon.textContent = '🌤️';
+                badgeText.textContent = 'Suasana Pagi';
+            }
+        }
+
+        function toggleDayNightManual() {
+            isNight = !isNight;
+            dayNightTimer = 0;
+            updateTimeUI();
+        }
+
+        function startGame() {
+            initAudio();
+            stopQuestionTimer();
+            resizeCanvas();
+            initEnvironmentDecor();
+            prepareShuffledQuestions();
+
+            // Reset semua statistik
+            collisionLives = MAX_COLLISION_LIVES;
+            wrongAnswersCount = 0;
+            correctAnswersCount = 0;
+            gameSpeed = 330;
+            distanceRun = 0;
+            runTimeSinceLastQuiz = 0;
+            dayNightTimer = 0;
+            isNight = false;
+            invulnerableTimer = 0;
+
+            obstacles = [];
+            quizItems = [];
+            floatingTexts = [];
+            obstacleSpawnTimer = 1.2;
+            quizItemSpawnTimer = 3.8;
+
+            dino.isGrounded = true;
+            dino.isDucking = false;
+            dino.vy = 0;
+            dino.y = groundY - dino.height;
+
+            updateHUD();
+            updateTimeUI();
+
+            document.getElementById('start-overlay').classList.add('hidden');
+            document.getElementById('gameover-overlay').classList.add('hidden');
+            document.getElementById('quiz-modal').classList.add('hidden');
+            document.getElementById('quiz-timer-badge').classList.remove('hidden');
+
+            gameState = 'PLAYING';
+            lastTimestamp = performance.now();
+
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        // =========================================================================
+        // 8. LOGIKA KUIS INTERAKTIF (TIMER 10 DETIK, HANYA JUDUL BAB, BENAR LANGSUNG LANJUT)
+        // =========================================================================
+        function stopQuestionTimer() {
+            if (questionTimerInterval) {
+                clearInterval(questionTimerInterval);
+                questionTimerInterval = null;
+            }
+        }
+
+        function updateQuestionTimerVisual() {
+            const timeText = document.getElementById('quiz-time-left');
+            const timerBar = document.getElementById('quiz-timer-bar');
+            const timerPill = document.getElementById('quiz-timer-pill');
+
+            const displaySec = Math.max(0, Math.ceil(questionTimeRemaining));
+            timeText.textContent = displaySec;
+
+            const pct = Math.max(0, Math.min(100, (questionTimeRemaining / QUESTION_TIME_LIMIT) * 100));
+            timerBar.style.width = `${pct}%`;
+
+            // Perubahan warna indikator waktu: Hijau (>5d) -> Kuning (4-5d) -> Merah (<=3d)
+            if (questionTimeRemaining <= 3) {
+                timerBar.className = "h-full bg-rose-500 transition-all duration-100 ease-linear";
+                timerPill.className = "flex items-center gap-1.5 bg-rose-100 border border-rose-400 text-rose-800 px-3 py-1 rounded-full font-game font-bold text-xs sm:text-sm animate-pulse";
+            } else if (questionTimeRemaining <= 5) {
+                timerBar.className = "h-full bg-amber-400 transition-all duration-100 ease-linear";
+                timerPill.className = "flex items-center gap-1.5 bg-amber-50 border border-amber-300 text-amber-800 px-3 py-1 rounded-full font-game font-bold text-xs sm:text-sm";
+            } else {
+                timerBar.className = "h-full bg-emerald-500 transition-all duration-100 ease-linear";
+                timerPill.className = "flex items-center gap-1.5 bg-emerald-50 border border-emerald-300 text-emerald-800 px-3 py-1 rounded-full font-game font-bold text-xs sm:text-sm";
+            }
+        }
+
+        function startQuestionTimer() {
+            stopQuestionTimer();
+            questionTimeRemaining = QUESTION_TIME_LIMIT;
+            let lastWholeSecond = QUESTION_TIME_LIMIT;
+            updateQuestionTimerVisual();
+
+            questionTimerInterval = setInterval(() => {
+                if (gameState !== 'QUIZ') {
+                    stopQuestionTimer();
+                    return;
+                }
+
+                questionTimeRemaining -= 0.1;
+                const currentWholeSecond = Math.ceil(questionTimeRemaining);
+
+                // Efek suara tick pada 3 detik terakhir (3, 2, 1)
+                if (currentWholeSecond !== lastWholeSecond && currentWholeSecond <= 3 && currentWholeSecond >= 1) {
+                    playTone('tick');
+                }
+                lastWholeSecond = currentWholeSecond;
+
+                updateQuestionTimerVisual();
+
+                if (questionTimeRemaining <= 0) {
+                    stopQuestionTimer();
+                    handleQuizTimeout();
+                }
+            }, 100);
+        }
+
+        function openNextQuiz() {
+            if (currentQuestionIndex >= shuffledQuestions.length) {
+                // Siswa berhasil menjawab ke-100 soal!
+                triggerGameOver(true, "Luar Biasa! Kamu berhasil menyelesaikan seluruh 100 soal acak!");
+                return;
+            }
+
+            gameState = 'QUIZ';
+            dino.isDucking = false;
+            playTone('quiz');
+
+            activeQuestion = shuffledQuestions[currentQuestionIndex];
+            // Tampilkan hanya judul Bab materi di paling atas (tanpa nomor urut soal)
+            document.getElementById('quiz-category').textContent = activeQuestion.bab;
+            document.getElementById('quiz-question').textContent = activeQuestion.q;
+
+            // Sembunyikan kotak penjelasan sebelumnya
+            document.getElementById('wrong-feedback-box').classList.add('hidden');
+
+            // Acak urutan tampilan pilihan A, B, C, D sambil menjaga indeks jawaban benar
+            activeOptionObjects = activeQuestion.opts.map((text, index) => ({
+                text,
+                isCorrect: index === activeQuestion.ans
+            }));
+            for (let i = activeOptionObjects.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [activeOptionObjects[i], activeOptionObjects[j]] = [activeOptionObjects[j], activeOptionObjects[i]];
+            }
+
+            const optionsContainer = document.getElementById('quiz-options');
+            optionsContainer.innerHTML = '';
+            const letters = ['A', 'B', 'C', 'D'];
+
+            activeOptionObjects.forEach((opt, idx) => {
+                const btn = document.createElement('button');
+                btn.className = "w-full text-left p-3 sm:p-3.5 rounded-2xl border-2 border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/70 transition flex items-center gap-3 font-medium text-xs sm:text-sm text-slate-800 cursor-pointer";
+                btn.innerHTML = `
+                    <span class="w-7 h-7 rounded-xl bg-slate-100 text-slate-700 font-game font-bold flex items-center justify-center shrink-0 border border-slate-300">
+                        ${letters[idx]}
+                    </span>
+                    <span class="flex-1">${opt.text}</span>
+                `;
+                btn.onclick = () => handleQuizAnswer(btn, opt.isCorrect, activeOptionObjects, optionsContainer);
+                optionsContainer.appendChild(btn);
+            });
+
+            document.getElementById('quiz-modal').classList.remove('hidden');
+            startQuestionTimer();
+        }
+
+        function handleQuizTimeout() {
+            const container = document.getElementById('quiz-options');
+            const buttons = container.querySelectorAll('button');
+            buttons.forEach(b => b.disabled = true);
+
+            playTone('wrong');
+            wrongAnswersCount++;
+            currentQuestionIndex++;
+            updateHUD();
+
+            let correctText = "";
+            activeOptionObjects.forEach((opt, i) => {
+                if (opt.isCorrect) {
+                    correctText = opt.text;
+                    buttons[i].classList.remove('border-slate-200');
+                    buttons[i].classList.add('border-emerald-500', 'bg-emerald-100', 'text-emerald-900', 'font-bold');
+                }
+            });
+
+            document.getElementById('wrong-feedback-title').textContent = "⏰ Waktu 10 Detik Habis!";
+            document.getElementById('feedback-wrong-count').textContent = wrongAnswersCount;
+            document.getElementById('correct-answer-text').textContent = correctText;
+            document.getElementById('explanation-text').textContent = activeQuestion.exp;
+
+            const continueBtn = document.getElementById('btn-continue-after-wrong');
+            if (wrongAnswersCount >= MAX_WRONG_ANSWERS) {
+                continueBtn.textContent = "LIHAT HASIL AKHIR (3x SALAH) ⚠️";
+            } else {
+                continueBtn.textContent = `LANJUT BERLARI (Sisa Kesempatan: ${MAX_WRONG_ANSWERS - wrongAnswersCount}x) ➡️`;
+            }
+
+            document.getElementById('wrong-feedback-box').classList.remove('hidden');
+        }
+
+        function handleQuizAnswer(selectedBtn, isCorrect, allOptions, container) {
+            stopQuestionTimer();
+
+            // Nonaktifkan semua tombol pilihan agar tidak diklik ganda
+            const buttons = container.querySelectorAll('button');
+            buttons.forEach(b => b.disabled = true);
+
+            if (isCorrect) {
+                // JAWABAN BENAR: Tanpa keterangan/penjelasan, langsung lanjut berlari!
+                playTone('correct');
+                correctAnswersCount++;
+                currentQuestionIndex++;
+                updateHUD();
+
+                // Tambah sedikit kecepatan lari agar semakin menantang
+                gameSpeed = Math.min(540, gameSpeed + 4);
+
+                // Efek teks melayang di canvas
+                floatingTexts.push({
+                    x: dino.x + 20,
+                    y: dino.y - 20,
+                    text: "✅ BENAR! LANJUT!",
+                    color: "#10b981",
+                    life: 1.2
+                });
+
+                // Tutup modal seketika dan lanjutkan permainan
+                document.getElementById('quiz-modal').classList.add('hidden');
+                runTimeSinceLastQuiz = 0;
+                obstacles = []; // Bersihkan rintangan terlalu dekat agar adil saat mulai lari lagi
+                quizItems = [];
+                invulnerableTimer = 1.2;
+                gameState = 'PLAYING';
+                lastTimestamp = performance.now();
+            } else {
+                // JAWABAN SALAH: Tampilkan keterangan & penjelasan materi
+                playTone('wrong');
+                wrongAnswersCount++;
+                currentQuestionIndex++;
+                updateHUD();
+
+                // Tandai tombol yang dipilih merah & tombol jawaban benar hijau
+                selectedBtn.classList.remove('border-slate-200');
+                selectedBtn.classList.add('border-rose-500', 'bg-rose-100', 'text-rose-900');
+
+                let correctText = "";
+                allOptions.forEach((opt, i) => {
+                    if (opt.isCorrect) {
+                        correctText = opt.text;
+                        buttons[i].classList.remove('border-slate-200');
+                        buttons[i].classList.add('border-emerald-500', 'bg-emerald-100', 'text-emerald-900', 'font-bold');
+                    }
+                });
+
+                // Isi kotak penjelasan
+                document.getElementById('wrong-feedback-title').textContent = "❌ Jawaban Kamu Kurang Tepat!";
+                document.getElementById('feedback-wrong-count').textContent = wrongAnswersCount;
+                document.getElementById('correct-answer-text').textContent = correctText;
+                document.getElementById('explanation-text').textContent = activeQuestion.exp;
+
+                const continueBtn = document.getElementById('btn-continue-after-wrong');
+                if (wrongAnswersCount >= MAX_WRONG_ANSWERS) {
+                    continueBtn.textContent = "LIHAT HASIL AKHIR (3x SALAH) ⚠️";
+                } else {
+                    continueBtn.textContent = `LANJUT BERLARI (Sisa Kesempatan: ${MAX_WRONG_ANSWERS - wrongAnswersCount}x) ➡️`;
+                }
+
+                document.getElementById('wrong-feedback-box').classList.remove('hidden');
+            }
+        }
+
+        function continueAfterWrong() {
+            document.getElementById('quiz-modal').classList.add('hidden');
+
+            // Cek aturan: jika sudah 3x salah jawab soal, langsung kalah walaupun nyawa tabrak masih ada!
+            if (wrongAnswersCount >= MAX_WRONG_ANSWERS) {
+                triggerGameOver(
+                    false,
+                    `Kamu sudah ${MAX_WRONG_ANSWERS} kali salah menjawab soal! (Sisa nyawa tabrakan ${collisionLives} tidak berlaku jika salah soal 3x).`
+                );
+                return;
+            }
+
+            runTimeSinceLastQuiz = 0;
+            obstacles = [];
+            quizItems = [];
+            invulnerableTimer = 1.2;
+            gameState = 'PLAYING';
+            lastTimestamp = performance.now();
+        }
+
+        // =========================================================================
+        // 9. AKHIR PERMAINAN (GAME OVER / MENANG)
+        // =========================================================================
+        function triggerGameOver(isVictory, reasonText) {
+            stopQuestionTimer();
+            gameState = 'GAMEOVER';
+            document.getElementById('quiz-modal').classList.add('hidden');
+            document.getElementById('quiz-timer-badge').classList.add('hidden');
+
+            const card = document.getElementById('gameover-card');
+            const emoji = document.getElementById('gameover-emoji');
+            const title = document.getElementById('gameover-title');
+            const reason = document.getElementById('gameover-reason');
+
+            if (isVictory) {
+                card.className = "bg-white rounded-3xl max-w-md w-full p-6 text-center shadow-2xl border-4 border-emerald-500 animate-pop";
+                emoji.textContent = "🏆";
+                title.textContent = "SELAMAT! MISI SELESAI!";
+                title.className = "font-game text-2xl sm:text-3xl font-bold text-emerald-600 mb-1";
+                reason.className = "text-sm font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 mb-4";
+            } else {
+                card.className = "bg-white rounded-3xl max-w-md w-full p-6 text-center shadow-2xl border-4 border-rose-500 animate-pop";
+                emoji.textContent = "🦖💥";
+                title.textContent = "YAH, KAMU KALAH!";
+                title.className = "font-game text-2xl sm:text-3xl font-bold text-rose-600 mb-1";
+                reason.className = "text-sm font-semibold text-rose-800 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 mb-4";
+            }
+
+            reason.textContent = reasonText;
+            document.getElementById('final-correct').textContent = correctAnswersCount;
+            document.getElementById('final-wrong').textContent = wrongAnswersCount;
+            document.getElementById('final-lives').textContent = collisionLives;
+
+            document.getElementById('gameover-overlay').classList.remove('hidden');
+        }
+
+        // =========================================================================
+        // 10. PEMBARUAN FISIKA & RINTANGAN (BATU & BURUNG)
+        // =========================================================================
+        function spawnObstacle() {
+            // Pilih secara acak antara Batu (rock/boulder) atau Burung (bird)
+            const isBird = Math.random() < 0.42;
+
+            if (isBird) {
+                // Burung terbang di 2 ketinggian: rendah (bisa dilompati) atau sedang (bisa ditunduki/dilompati)
+                const flyHigh = Math.random() < 0.55;
+                obstacles.push({
+                    type: 'bird',
+                    x: canvas.width + 40,
+                    y: flyHigh ? groundY - 76 : groundY - 44,
+                    width: 44,
+                    height: 30,
+                    wingTimer: 0,
+                    passed: false
+                });
+            } else {
+                // Batu tunggal atau tumpukan batu
+                const isDoubleRock = Math.random() < 0.4;
+                const w = isDoubleRock ? 56 : 36;
+                const h = isDoubleRock ? 42 : 34;
+                obstacles.push({
+                    type: 'rock',
+                    isDouble: isDoubleRock,
+                    x: canvas.width + 40,
+                    y: groundY - h,
+                    width: w,
+                    height: h,
+                    passed: false
+                });
+            }
+        }
+
+        function updateGame(dt) {
+            // 1. Siklus waktu Pagi & Malam otomatis
+            dayNightTimer += dt;
+            if (dayNightTimer >= DAY_NIGHT_CYCLE_SECONDS) {
+                dayNightTimer = 0;
+                isNight = !isNight;
+                updateTimeUI();
+            }
+
+            // 2. Hitung mundur menuju soal berikutnya
+            runTimeSinceLastQuiz += dt;
+            const remainingQuizSec = Math.max(0, Math.ceil(QUIZ_INTERVAL_SECONDS - runTimeSinceLastQuiz));
+            document.getElementById('next-quiz-countdown').textContent = remainingQuizSec;
+
+            if (runTimeSinceLastQuiz >= QUIZ_INTERVAL_SECONDS) {
+                openNextQuiz();
+                return;
+            }
+
+            // 3. Kekebalan sementara setelah tabrakan
+            if (invulnerableTimer > 0) {
+                invulnerableTimer -= dt;
+            }
+
+            // 4. Fisika lompatan Dino
+            const activeDinoHeight = dino.isDucking ? dino.duckHeight : dino.height;
+            if (!dino.isGrounded) {
+                dino.vy += dino.gravity * dt;
+                dino.y += dino.vy * dt;
+
+                if (dino.y >= groundY - activeDinoHeight) {
+                    dino.y = groundY - activeDinoHeight;
+                    dino.vy = 0;
+                    dino.isGrounded = true;
+                }
+            } else {
+                dino.y = groundY - activeDinoHeight;
+                dino.legFrame += dt * 14;
+            }
+
+            // 5. Gerakkan awan & jarak jalan
+            distanceRun += gameSpeed * dt;
+            clouds.forEach(c => {
+                c.x -= c.speed * dt;
+                if (c.x < -120) {
+                    c.x = canvas.width + 80;
+                    c.y = 30 + Math.random() * 90;
+                }
+            });
+
+            // 6. Munculkan rintangan Batu & Burung
+            obstacleSpawnTimer -= dt;
+            if (obstacleSpawnTimer <= 0) {
+                spawnObstacle();
+                // Jarak antar rintangan proporsional dengan kecepatan
+                obstacleSpawnTimer = 1.3 + Math.random() * 0.95;
+            }
+
+            // 6b. Munculkan Ikon Bintang/Buku Emas Kuis di jalur lari
+            quizItemSpawnTimer -= dt;
+            if (quizItemSpawnTimer <= 0) {
+                const isHigh = Math.random() < 0.45;
+                quizItems.push({
+                    x: canvas.width + 60,
+                    y: isHigh ? groundY - 95 : groundY - 46,
+                    size: 30,
+                    bobTimer: Math.random() * Math.PI * 2
+                });
+                quizItemSpawnTimer = 4.8 + Math.random() * 2.5;
+            }
+
+            // 7. Perbarui posisi rintangan & cek tabrakan
+            const dinoHitbox = {
+                x: dino.x + 8,
+                y: dino.y + 6,
+                w: (dino.isDucking ? dino.width + 8 : dino.width) - 16,
+                h: activeDinoHeight - 10
+            };
+
+            // Cek sentuhan Dino dengan Bintang/Buku Kuis Emas
+            for (let i = quizItems.length - 1; i >= 0; i--) {
+                const item = quizItems[i];
+                item.x -= gameSpeed * dt;
+                item.bobTimer += dt * 6;
+
+                const itemBox = {
+                    x: item.x - item.size / 2,
+                    y: item.y - item.size / 2,
+                    w: item.size,
+                    h: item.size
+                };
+
+                const touchedQuizItem =
+                    dinoHitbox.x < itemBox.x + itemBox.w &&
+                    dinoHitbox.x + dinoHitbox.w > itemBox.x &&
+                    dinoHitbox.y < itemBox.y + itemBox.h &&
+                    dinoHitbox.y + dinoHitbox.h > itemBox.y;
+
+                if (touchedQuizItem) {
+                    quizItems.splice(i, 1);
+                    openNextQuiz();
+                    return;
+                }
+
+                if (item.x < -50) {
+                    quizItems.splice(i, 1);
+                }
+            }
+
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                const obs = obstacles[i];
+                const speedMultiplier = obs.type === 'bird' ? 1.15 : 1.0;
+                obs.x -= gameSpeed * speedMultiplier * dt;
+                if (obs.type === 'bird') obs.wingTimer += dt * 10;
+
+                // Cek tabrakan (AABB dengan toleransi ramah anak)
+                const obsHitbox = {
+                    x: obs.x + 5,
+                    y: obs.y + 5,
+                    w: obs.width - 10,
+                    h: obs.height - 8
+                };
+
+                const isColliding =
+                    dinoHitbox.x < obsHitbox.x + obsHitbox.w &&
+                    dinoHitbox.x + dinoHitbox.w > obsHitbox.x &&
+                    dinoHitbox.y < obsHitbox.y + obsHitbox.h &&
+                    dinoHitbox.y + dinoHitbox.h > obsHitbox.y;
+
+                if (isColliding && invulnerableTimer <= 0) {
+                    playTone('hit');
+                    collisionLives--;
+                    updateHUD();
+                    invulnerableTimer = 1.5;
+
+                    // Efek getar pada layar game
+                    const wrapper = document.getElementById('game-wrapper');
+                    wrapper.classList.remove('animate-shake');
+                    void wrapper.offsetWidth;
+                    wrapper.classList.add('animate-shake');
+
+                    floatingTexts.push({
+                        x: dino.x,
+                        y: dino.y - 15,
+                        text: `💥 -1 Nyawa (${collisionLives}/10)`,
+                        color: "#f43f5e",
+                        life: 1.2
+                    });
+
+                    // Hapus rintangan yang tertabrak agar tidak memicu hit beruntun
+                    obstacles.splice(i, 1);
+
+                    // Cek jika nyawa tabrakan mencapai 0 (10 kali menabrak)
+                    if (collisionLives <= 0) {
+                        triggerGameOver(
+                            false,
+                            "Nyawa Dino habis karena sudah menabrak batu atau burung sebanyak 10 kali!"
+                        );
+                        return;
+                    }
+                    continue;
+                }
+
+                // Hapus rintangan yang sudah lewat layar kiri
+                if (obs.x + obs.width < -50) {
+                    obstacles.splice(i, 1);
+                }
+            }
+
+            // 8. Perbarui teks melayang
+            for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                floatingTexts[i].y -= 35 * dt;
+                floatingTexts[i].life -= dt;
+                if (floatingTexts[i].life <= 0) {
+                    floatingTexts.splice(i, 1);
+                }
+            }
+        }
+
+        // =========================================================================
+        // 11. PENGGAMBARAN VISUAL (PAGI/MALAM, GEDUNG SDIT GEMA INSAN MANDIRI, DINO)
+        // =========================================================================
+        function drawBackgroundAndSchool() {
+            const w = canvas.width;
+            const h = canvas.height;
+
+            // 1. Gradien Langit Pagi vs Malam
+            const skyGrad = ctx.createLinearGradient(0, 0, 0, groundY);
+            if (isNight) {
+                skyGrad.addColorStop(0, '#090d24');
+                skyGrad.addColorStop(0.55, '#172554');
+                skyGrad.addColorStop(1, '#1e3a8a');
+            } else {
+                skyGrad.addColorStop(0, '#38bdf8');
+                skyGrad.addColorStop(0.6, '#bae6fd');
+                skyGrad.addColorStop(1, '#fef9c3');
+            }
+            ctx.fillStyle = skyGrad;
+            ctx.fillRect(0, 0, w, groundY);
+
+            // 2. Matahari (Pagi) atau Bulan & Bintang (Malam)
+            if (isNight) {
+                // Bintang berkelip
+                stars.forEach(s => {
+                    const alpha = 0.4 + 0.6 * Math.abs(Math.sin(performance.now() / 600 + s.twinkle));
+                    ctx.fillStyle = `rgba(255, 255, 224, ${alpha})`;
+                    ctx.beginPath();
+                    ctx.arc(s.x % w, s.y, s.size, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+
+                // Bulan Sabit / Purnama lembut
+                ctx.fillStyle = '#fef08a';
+                ctx.beginPath();
+                ctx.arc(w - 110, 68, 26, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#111b42';
+                ctx.beginPath();
+                ctx.arc(w - 100, 62, 22, 0, Math.PI * 2);
+                ctx.fill();
+            } else {
+                // Matahari Pagi yang Cerah
+                ctx.fillStyle = 'rgba(253, 224, 71, 0.35)';
+                ctx.beginPath();
+                ctx.arc(w - 110, 72, 42, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#facc15';
+                ctx.beginPath();
+                ctx.arc(w - 110, 72, 28, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // 3. Awan Bergerak
+            clouds.forEach(c => {
+                ctx.fillStyle = isNight ? 'rgba(148, 163, 184, 0.22)' : 'rgba(255, 255, 255, 0.85)';
+                ctx.beginPath();
+                ctx.arc(c.x, c.y, 20 * c.scale, 0, Math.PI * 2);
+                ctx.arc(c.x + 18 * c.scale, c.y - 8 * c.scale, 24 * c.scale, 0, Math.PI * 2);
+                ctx.arc(c.x + 38 * c.scale, c.y, 18 * c.scale, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // 4. Perbukitan Hijau di Kejauhan
+            ctx.fillStyle = isNight ? '#064e3b' : '#34d399';
+            ctx.beginPath();
+            ctx.moveTo(0, groundY);
+            ctx.quadraticCurveTo(w * 0.25, groundY - 75, w * 0.5, groundY - 25);
+            ctx.quadraticCurveTo(w * 0.78, groundY - 85, w, groundY - 20);
+            ctx.lineTo(w, groundY);
+            ctx.closePath();
+            ctx.fill();
+
+            // 5. GEDUNG SEKOLAH "SDIT GEMA INSAN MANDIRI" DI LATAR BELAKANG (PARALLAX)
+            const schoolCycleWidth = Math.max(950, w + 350);
+            const schoolX = w - ((distanceRun * 0.22) % schoolCycleWidth);
+            drawSchoolBuilding(schoolX, groundY);
+
+            // 6. Tanah & Lintasan Lari
+            ctx.fillStyle = isNight ? '#1e293b' : '#d97706';
+            ctx.fillRect(0, groundY, w, h - groundY);
+
+            // Rumput di bibir tanah
+            ctx.fillStyle = isNight ? '#059669' : '#16a34a';
+            ctx.fillRect(0, groundY, w, 10);
+
+            // Tekstur kerikil jalan bergerak
+            ctx.fillStyle = isNight ? '#475569' : '#92400e';
+            const step = 65;
+            const offset = distanceRun % step;
+            for (let x = -offset; x < w; x += step) {
+                ctx.fillRect(x, groundY + 20, 18, 4);
+                ctx.fillRect(x + 30, groundY + 36, 12, 3);
+            }
+        }
+
+        function drawSchoolBuilding(x, baseY) {
+            ctx.save();
+            const bWidth = 280;
+            const bHeight = 115;
+            const bTop = baseY - bHeight;
+
+            // Dinding utama gedung sekolah
+            ctx.fillStyle = isNight ? '#cbd5e1' : '#fef3c7';
+            ctx.fillRect(x, bTop, bWidth, bHeight);
+            ctx.strokeStyle = isNight ? '#64748b' : '#d97706';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x, bTop, bWidth, bHeight);
+
+            // Atap Limas Sekolah (Hijau Islami)
+            ctx.fillStyle = isNight ? '#065f46' : '#059669';
+            ctx.beginPath();
+            ctx.moveTo(x - 14, bTop);
+            ctx.lineTo(x + bWidth / 2, bTop - 42);
+            ctx.lineTo(x + bWidth + 14, bTop);
+            ctx.closePath();
+            ctx.fill();
+
+            // Kubah Kecil & Bulan Bintang di Puncak Sekolah
+            ctx.fillStyle = '#f59e0b';
+            ctx.beginPath();
+            ctx.arc(x + bWidth / 2, bTop - 46, 8, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Papan Nama Sekolah: "SDIT GEMA INSAN MANDIRI"
+            const signW = 240;
+            const signH = 26;
+            const signX = x + (bWidth - signW) / 2;
+            const signY = bTop + 10;
+
+            ctx.fillStyle = '#065f46';
+            drawRoundRect(ctx, signX, signY, signW, signH, 6);
+            ctx.fill();
+            ctx.strokeStyle = '#fbbf24';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 12px "Fredoka", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('🏫 SDIT GEMA INSAN MANDIRI', x + bWidth / 2, signY + signH / 2 + 1);
+
+            // Jendela-jendela Kelas (Menyala kuning hangat saat malam hari!)
+            const winColor = isNight ? '#fde047' : '#38bdf8';
+            for (let row = 0; row < 2; row++) {
+                for (let col = 0; col < 5; col++) {
+                    if (row === 1 && col === 2) continue; // Pintu tengah
+                    const wx = x + 22 + col * 50;
+                    const wy = bTop + 46 + row * 34;
+                    ctx.fillStyle = winColor;
+                    ctx.fillRect(wx, wy, 32, 22);
+                    ctx.strokeStyle = '#475569';
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(wx, wy, 32, 22);
+                }
+            }
+
+            // Pintu Masuk Utama Sekolah
+            ctx.fillStyle = '#78350f';
+            ctx.fillRect(x + bWidth / 2 - 18, baseY - 38, 36, 38);
+
+            // Tiang Bendera Merah Putih di Samping Gedung
+            const poleX = x - 26;
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(poleX, baseY);
+            ctx.lineTo(poleX, baseY - 125);
+            ctx.stroke();
+
+            // Bendera Merah Putih berkibar
+            const wave = Math.sin(performance.now() / 220) * 3;
+            ctx.fillStyle = '#ef4444';
+            ctx.fillRect(poleX + 2, baseY - 123, 34, 11 + wave * 0.2);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(poleX + 2, baseY - 112, 34, 11 + wave * 0.2);
+
+            ctx.restore();
+        }
+
+        function drawDino() {
+            // Efek berkedip saat kebal sesaat setelah menabrak
+            if (invulnerableTimer > 0 && Math.floor(invulnerableTimer * 16) % 2 === 0) {
+                return;
+            }
+
+            ctx.save();
+            const x = dino.x;
+            const y = dino.y;
+
+            if (dino.isDucking) {
+                // Gambar Dino Menunduk (Memanjang ke depan, rendah)
+                // Ekor
+                ctx.fillStyle = '#15803d';
+                ctx.beginPath();
+                ctx.moveTo(x - 12, y + 14);
+                ctx.lineTo(x + 6, y + 8);
+                ctx.lineTo(x + 6, y + 24);
+                ctx.closePath();
+                ctx.fill();
+
+                // Badan & Kepala mendatar
+                ctx.fillStyle = '#16a34a';
+                drawRoundRect(ctx, x, y + 4, 56, 22, 10);
+                ctx.fill();
+
+                // Punggung berduri kecil
+                ctx.fillStyle = '#f59e0b';
+                ctx.beginPath();
+                ctx.arc(x + 12, y + 4, 4, Math.PI, 0);
+                ctx.arc(x + 24, y + 4, 4, Math.PI, 0);
+                ctx.fill();
+
+                // Mata
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(x + 44, y + 11, 4.5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#0f172a';
+                ctx.beginPath();
+                ctx.arc(x + 45.5, y + 11, 2.2, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Kaki berlari
+                const step = Math.sin(dino.legFrame) * 5;
+                ctx.fillStyle = '#15803d';
+                ctx.fillRect(x + 14 + step, y + 24, 7, 8);
+                ctx.fillRect(x + 32 - step, y + 24, 7, 8);
+            } else {
+                // Gambar Dino Berdiri / Melompat
+                // Ekor
+                ctx.fillStyle = '#15803d';
+                ctx.beginPath();
+                ctx.moveTo(x - 10, y + 28);
+                ctx.lineTo(x + 10, y + 22);
+                ctx.lineTo(x + 10, y + 40);
+                ctx.closePath();
+                ctx.fill();
+
+                // Badan utama
+                ctx.fillStyle = '#16a34a';
+                drawRoundRect(ctx, x + 6, y + 18, 28, 28, 10);
+                ctx.fill();
+
+                // Perut krem cerah
+                ctx.fillStyle = '#bbf7d0';
+                drawRoundRect(ctx, x + 18, y + 22, 14, 20, 6);
+                ctx.fill();
+
+                // Kepala Dino
+                ctx.fillStyle = '#22c55e';
+                drawRoundRect(ctx, x + 14, y, 32, 24, 9);
+                ctx.fill();
+
+                // Topi / Pita Pelajar SDIT (Merah Putih / Kuning)
+                ctx.fillStyle = '#f59e0b';
+                drawRoundRect(ctx, x + 16, y - 3, 24, 6, 3);
+                ctx.fill();
+
+                // Mata besar ekspresif
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(x + 34, y + 9, 5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#0f172a';
+                ctx.beginPath();
+                ctx.arc(x + 35.5, y + 9, 2.5, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Senyum ramah
+                ctx.strokeStyle = '#064e3b';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(x + 36, y + 15, 5, 0.1 * Math.PI, 0.8 * Math.PI);
+                ctx.stroke();
+
+                // Tangan kecil
+                ctx.fillStyle = '#15803d';
+                ctx.fillRect(x + 30, y + 27, 9, 5);
+
+                // Kaki berlari animasi
+                const step = dino.isGrounded ? Math.sin(dino.legFrame) * 6 : 3;
+                ctx.fillStyle = '#15803d';
+                ctx.fillRect(x + 11 + step, y + 44, 8, 10);
+                ctx.fillRect(x + 23 - step, y + 44, 8, 10);
+            }
+
+            ctx.restore();
+        }
+
+        function drawObstacles() {
+            obstacles.forEach(obs => {
+                ctx.save();
+                if (obs.type === 'rock') {
+                    // Gambar Batu Besar
+                    ctx.fillStyle = isNight ? '#64748b' : '#78716c';
+                    ctx.beginPath();
+                    ctx.moveTo(obs.x + 4, obs.y + obs.height);
+                    ctx.lineTo(obs.x + 8, obs.y + 8);
+                    ctx.lineTo(obs.x + obs.width * 0.5, obs.y);
+                    ctx.lineTo(obs.x + obs.width - 6, obs.y + 10);
+                    ctx.lineTo(obs.x + obs.width, obs.y + obs.height);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Highlight bayangan batu
+                    ctx.fillStyle = isNight ? '#94a3b8' : '#a8a29e';
+                    ctx.beginPath();
+                    ctx.moveTo(obs.x + 10, obs.y + 10);
+                    ctx.lineTo(obs.x + obs.width * 0.48, obs.y + 3);
+                    ctx.lineTo(obs.x + obs.width * 0.42, obs.y + obs.height - 4);
+                    ctx.lineTo(obs.x + 8, obs.y + obs.height - 4);
+                    ctx.closePath();
+                    ctx.fill();
+                } else {
+                    // Gambar Burung Terbang
+                    const flap = Math.sin(obs.wingTimer) * 11;
+                    // Badan burung
+                    ctx.fillStyle = '#ea580c';
+                    ctx.beginPath();
+                    ctx.ellipse(obs.x + 22, obs.y + 16, 18, 10, 0, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Paruh kuning ke kiri
+                    ctx.fillStyle = '#facc15';
+                    ctx.beginPath();
+                    ctx.moveTo(obs.x + 5, obs.y + 13);
+                    ctx.lineTo(obs.x - 6, obs.y + 17);
+                    ctx.lineTo(obs.x + 5, obs.y + 20);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Mata burung
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(obs.x + 12, obs.y + 13, 3.5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#000000';
+                    ctx.beginPath();
+                    ctx.arc(obs.x + 11, obs.y + 13, 1.8, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Sayap mengepak
+                    ctx.fillStyle = '#fb923c';
+                    ctx.beginPath();
+                    ctx.moveTo(obs.x + 18, obs.y + 15);
+                    ctx.lineTo(obs.x + 28, obs.y + 15 - flap);
+                    ctx.lineTo(obs.x + 34, obs.y + 15);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+                ctx.restore();
+            });
+        }
+
+        function drawQuizItems() {
+            quizItems.forEach(item => {
+                ctx.save();
+                const floatY = item.y + Math.sin(item.bobTimer) * 5;
+
+                // Lingkaran cahaya keemasan di sekitar bintang kuis
+                ctx.fillStyle = 'rgba(250, 204, 21, 0.35)';
+                ctx.beginPath();
+                ctx.arc(item.x, floatY, 22, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Bintang emas 5 sudut
+                ctx.fillStyle = '#facc15';
+                ctx.strokeStyle = '#b45309';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                const spikes = 5;
+                const outerR = 15;
+                const innerR = 7;
+                for (let i = 0; i < spikes * 2; i++) {
+                    const r = i % 2 === 0 ? outerR : innerR;
+                    const angle = (i * Math.PI) / spikes - Math.PI / 2;
+                    const px = item.x + Math.cos(angle) * r;
+                    const py = floatY + Math.sin(angle) * r;
+                    if (i === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+
+                // Tanda tanya kecil di tengah bintang
+                ctx.fillStyle = '#78350f';
+                ctx.font = 'bold 12px "Fredoka", sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('?', item.x, floatY + 1);
+
+                ctx.restore();
+            });
+        }
+
+        function drawFloatingTexts() {
+            floatingTexts.forEach(ft => {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, ft.life);
+                ctx.font = 'bold 16px "Fredoka", sans-serif';
+                ctx.fillStyle = ft.color;
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 3;
+                ctx.strokeText(ft.text, ft.x, ft.y);
+                ctx.fillText(ft.text, ft.x, ft.y);
+                ctx.restore();
+            });
+        }
+
+        // =========================================================================
+        // 12. LOOP ANIMASI UTAMA
+        // =========================================================================
+        function gameLoop(timestamp) {
+            const dt = Math.min(0.05, (timestamp - lastTimestamp) / 1000);
+            lastTimestamp = timestamp;
+
+            if (gameState === 'PLAYING') {
+                updateGame(dt);
+            }
+
+            // Gambar seluruh scene setiap frame
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawBackgroundAndSchool();
+            drawQuizItems();
+            drawObstacles();
+            drawDino();
+            drawFloatingTexts();
+
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        function initGameScreen() {
+            resizeCanvas();
+            initEnvironmentDecor();
+            drawBackgroundAndSchool();
+            drawDino();
+        }
+
+        // Jalankan inisialisasi secepat mungkin saat DOM siap dan saat window load
+        document.addEventListener('DOMContentLoaded', initGameScreen);
+        window.addEventListener('load', initGameScreen);
+
+        window.addEventListener('resize', () => {
+            resizeCanvas();
+            if (gameState !== 'PLAYING') {
+                drawBackgroundAndSchool();
+                drawQuizItems();
+                drawDino();
+            }
+        });
+    </script>
+</body>
+</html>
